@@ -1,0 +1,45 @@
+# さんすうアプリ → ゲーム：げんき（スタミナ）の とどけかた
+
+ゲームの「げんき⚡」は、さんすうアプリの **実力テストの点数** で増える。
+2つのアプリは localStorage でつながるので、**同じサイト（同じオリジン）で公開する** 必要がある。
+
+- 例：`https://baibaikin2525.github.io/math-app/` と `https://baibaikin2525.github.io/myson-game/`
+  → オリジン（`https://baibaikin2525.github.io`）が同じなので localStorage を共有できる
+- 別ドメイン・別ポートだと共有できない（ローカルで試すときは `?dev=1` のテスト用メニューを使う）
+
+## キー
+
+| キー | 書く側 | 中身 |
+|---|---|---|
+| `mathapp.v1.profiles` / `mathapp.v1.current` | さんすうアプリ | こども一覧（ゲームは読むだけ。同じ子供で遊べる） |
+| `mathapp.v1.game.grants.<こどものid>` | さんすうアプリ | げんきの届け `[{ id, date, amount, reason }]`（新しい200件） |
+| `mathapp.v1.game.save.<こどものid>` | ゲーム | ゲームのセーブ |
+
+- どれも `mathapp.` で始まるので、さんすうアプリの「バックアップ・もどす」に一緒に入る
+- 届けは **さんすうアプリが追加するだけ**、ゲームは **読むだけ**（取りこんだ `id` をセーブ側で覚える）。
+  2つのアプリが同じキーを書き合わないので、同時に開いていても壊れない
+- ゲームは 起動時・画面に戻ったとき・4秒ごと・別タブで書かれたとき（`storage` イベント）に取りこむ
+- げんきの上限は 200（`config.js` の `CFG.staminaMax`）。あふれた分は捨てる
+
+## さんすうアプリ側に足すコード（rewards.js など）
+
+```js
+// 実力テストが おわったら よぶ。score（てんすう）が そのまま ゲームの げんきに なる
+function grantGameStamina(score, reason = 'じつりょくテスト') {
+  const profile = currentProfile();
+  if (!profile) return;
+  const key = `mathapp.v1.game.grants.${profile.id}`;
+  const list = readJSON(key, []);
+  const arr = Array.isArray(list) ? list : [];
+  arr.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, // かぶらない id
+    date: new Date().toISOString(),
+    amount: Math.max(0, Math.floor(score)),
+    reason,
+  });
+  writeJSON(key, arr.slice(-200));
+}
+```
+
+点数の決め方（100点満点か、正解数×○か、1日1回だけにするか など）は さんすうアプリ側で決める。
+ゲーム側は `amount` をそのまま足すだけ。

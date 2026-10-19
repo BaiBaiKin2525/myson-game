@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#5a3a20">
+  <title>おじいちゃんの いえ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="view"></canvas>
+
+  <div id="play" class="hidden">
+    <div id="hud">
+      <div id="stamina" class="chip">⚡ <div class="bar"><i id="stBar"></i></div><span id="stNum">0</span></div>
+      <div class="chip"><img class="ic s" id="coinIc" alt=""> <span id="moneyNum">0</span>G</div>
+      <div class="chip">📅 <span id="dayNum">1</span>にちめ</div>
+      <div id="tidyChip" class="chip">🧹 かたづけ <span id="tidyNum">0/10</span></div>
+      <div class="sp"></div>
+      <button id="bagBtn" class="round" aria-label="もちもの">🎒</button>
+      <button id="menuBtn" class="round" aria-label="メニュー">☰</button>
+    </div>
+
+    <div id="dpad" aria-label="じゅうじキー">
+      <span class="ar up">▲</span><span class="ar left">◀</span><span class="ar right">▶</span><span class="ar down">▼</span>
+    </div>
+    <div id="selName"></div>
+    <div id="hotbar"></div>
+    <button id="btnA" aria-label="Aボタン">A</button>
+
+    <div id="fishUI" class="hidden">
+      <div id="fmsg"></div>
+      <div class="gauge"><div id="fzone"></div><div id="fcur"></div></div>
+      <div class="frow"><span id="fhits"></span><span id="fmiss"></span></div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="dialog" class="hidden">
+    <div id="dWho"></div>
+    <div id="dText"></div>
+    <div id="dChoices"></div>
+    <div id="dNext">▼</div>
+  </div>
+
+  <div id="catch" class="hidden"></div>
+
+  <div id="panel" class="hidden">
+    <div class="box">
+      <div class="head"><h2 id="panelTitle"></h2><button id="panelClose" aria-label="とじる">✕</button></div>
+      <div id="panelBody"></div>
+    </div>
+  </div>
+
+  <div id="fade"><div id="fadeText"></div></div>
+
+  <div id="title" class="hidden">
+    <div class="logo">
+      <div class="sub">ぼくの わたしの</div>
+      <h1>おじいちゃんの いえ</h1>
+      <div class="sub2">〜 つりと はたけの ものがたり 〜</div>
+    </div>
+    <p class="who">だれが あそぶ？</p>
+    <div id="profiles"></div>
+    <p class="note">⚡ げんきは さんすうアプリの「じつりょくテスト」で ふえるよ</p>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="bridge.js"></script>
+  <script src="sprites.js"></script>
+  <script src="world.js"></script>
+  <script src="ui.js"></script>
+  <script src="game.js"></script>
+  <script>
+    window.addEventListener('load', () => { document.getElementById('coinIc').src = iconURL('coin'); });
+  </script>
+</body>
+</html>
