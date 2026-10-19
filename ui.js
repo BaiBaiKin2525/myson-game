@@ -200,11 +200,12 @@ UI.closePanel = () => {
 UI.hud = () => {
   const s = G.save;
   if (!s) return;
-  const st = G.dev && G.infinite ? '∞' : s.stamina;
-  $('stNum').textContent = st;
-  const ratio = Math.min(1, s.stamina / CFG.staminaMax);
+  const inf = unlimitedStamina();
+  $('stNum').textContent = inf ? '∞' : s.stamina;
+  // バーは 1にちぶん（150）で いっぱい。それより おおい ぶんは かずで わかる
+  const ratio = inf ? 1 : Math.min(1, s.stamina / CFG.staminaDay);
   $('stBar').style.width = `${Math.round(ratio * 100)}%`;
-  $('stamina').classList.toggle('low', s.stamina < 10);
+  $('stamina').classList.toggle('low', !inf && s.stamina < 10);
   $('moneyNum').textContent = s.money;
   $('dayNum').textContent = s.day;
   const tidyChip = $('tidyChip');

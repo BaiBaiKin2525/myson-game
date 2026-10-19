@@ -12,6 +12,7 @@
 const KEY = {
   profiles: 'mathapp.v1.profiles',
   current: 'mathapp.v1.current',
+  unlimited: 'mathapp.v1.game.unlimited', // さんすうアプリの ほごしゃ メニューで あいことば を いれると true（げんき むせいげん）
   grants: (id) => `mathapp.v1.game.grants.${id}`,
   save: (id) => `mathapp.v1.game.save.${id}`,
 };
@@ -49,6 +50,9 @@ function loadProfiles() {
 }
 
 const currentProfileId = () => Store.get(KEY.current, null);
+
+// おとなの デバッグ：さんすうアプリで「claude」を いれた たんまつ（または ?dev=1 の むげん スイッチ）では げんきが へらない
+const unlimitedStamina = () => Store.get(KEY.unlimited, false) === true || (G.dev && G.infinite);
 
 function newSave() {
   return {

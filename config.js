@@ -4,7 +4,8 @@
 const T = 32; // 1マスの おおきさ（ドット）
 
 const CFG = {
-  staminaMax: 200,     // げんきの じょうげん（じつりょくテスト 2かいぶん くらい）
+  staminaMax: 1050,    // げんきの じょうげん（じつりょくテストは 1にち さいこう 150 → 1しゅうかん ぶん ためられる）
+  staminaDay: 150,     // HUD の バーが いっぱいに なる げんき（1にちぶん）
   starterStamina: 40,  // はじめて あそぶ ときの げんき
   // うごくと へる げんき
   cost: { tidy: 1, cast: 3, hoe: 3, weed: 2, rock: 4, water: 2, plant: 1 },

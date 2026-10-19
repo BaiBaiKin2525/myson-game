@@ -111,7 +111,7 @@ function backToTitle() {
 
 function spend(n) {
   const s = G.save;
-  if (G.dev && G.infinite) return true;
+  if (unlimitedStamina()) return true;
   if (s.stamina < n) {
     Sfx.play('err');
     UI.flashStamina();
@@ -237,7 +237,10 @@ function setupInput() {
     else checkGrants();
   });
   addEventListener('focus', checkGrants);
-  addEventListener('storage', (e) => { if (G.pid && e.key === KEY.grants(G.pid)) checkGrants(); });
+  addEventListener('storage', (e) => {
+    if (G.pid && e.key === KEY.grants(G.pid)) checkGrants();
+    if (e.key === KEY.unlimited) UI.hud();
+  });
   addEventListener('pagehide', persist);
 }
 
@@ -317,7 +320,7 @@ function update(dt) {
   G.saveT += dt;
   if (G.saveT > 15) { G.saveT = 0; persist(); }
   G.grantT += dt;
-  if (G.grantT > 4) { G.grantT = 0; checkGrants(); }
+  if (G.grantT > 4) { G.grantT = 0; checkGrants(); UI.hud(); }
 }
 
 function tryStep(d) {
@@ -1010,7 +1013,7 @@ function openBag() {
       box.appendChild(grid);
       return;
     }
-    box.appendChild(el('div', 'wallet', `⚡ げんき <b>${s.stamina}</b> / ${CFG.staminaMax}　${iconImg('coin', 'ic s')} <b>${s.money}G</b>`));
+    box.appendChild(el('div', 'wallet', `⚡ げんき <b>${unlimitedStamina() ? '∞' : s.stamina}</b> / ${CFG.staminaMax}　${iconImg('coin', 'ic s')} <b>${s.money}G</b>`));
     const grid = el('div', 'grid');
     const cell = (icon, name, n) => {
       const c = el('div', 'cell', `${iconImg(icon, 'ic m')}${n != null ? `<b>${n}</b>` : ''}<span>${name}</span>`);
