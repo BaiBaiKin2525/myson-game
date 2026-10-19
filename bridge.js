@@ -3,7 +3,7 @@
 //
 // おなじ サイト（おなじ ドメイン）で ひらくと localStorage を いっしょに つかえる。
 //   こども         mathapp.v1.profiles / mathapp.v1.current   … さんすうアプリが つくる（よむ だけ）
-//   げんきの とどけ mathapp.v1.game.grants.<こどもの id>      … さんすうアプリが「じつりょくテスト」の あとに ついか する
+//   でんちの とどけ mathapp.v1.game.grants.<こどもの id>      … さんすうアプリが「じつりょくテスト」の あとに ついか する
 //                   [{ id, date, amount, reason }]（あたらしい 200 けん）
 //   ゲームの きろく mathapp.v1.game.save.<こどもの id>        … ゲームだけが かく
 // どちらも「mathapp.」で はじまるので、さんすうアプリの バックアップに いっしょに はいる。
@@ -12,7 +12,7 @@
 const KEY = {
   profiles: 'mathapp.v1.profiles',
   current: 'mathapp.v1.current',
-  unlimited: 'mathapp.v1.game.unlimited', // さんすうアプリの ほごしゃ メニューで あいことば を いれると true（げんき むせいげん）
+  unlimited: 'mathapp.v1.game.unlimited', // さんすうアプリの ほごしゃ メニューで あいことば を いれると true（でんち むせいげん）
   grants: (id) => `mathapp.v1.game.grants.${id}`,
   save: (id) => `mathapp.v1.game.save.${id}`,
 };
@@ -52,18 +52,22 @@ function loadProfiles() {
 
 const currentProfileId = () => Store.get(KEY.current, null);
 
-// おとなの デバッグ：さんすうアプリで「claude」を いれた たんまつ（または ?dev=1 の むげん スイッチ）では げんきが へらない
+// おとなの デバッグ：さんすうアプリで「claude」を いれた たんまつ（または ?dev=1 の むげん スイッチ）では でんちが へらない
 const unlimitedStamina = () => Store.get(KEY.unlimited, false) === true || (G.dev && G.infinite);
+
+// ロボの おはなしに なった ときに 2 に した（1 の セーブは つかわず さいしょから）
+const SAVE_V = 2;
 
 function newSave() {
   return {
-    v: 1,
+    v: SAVE_V,
     created: new Date().toISOString(),
     day: 1,
     money: 0,
     stamina: CFG.starterStamina,
-    seen: [],                                   // とりこんだ げんきの とどけ（id）
+    seen: [],                                   // とりこんだ でんちの とどけ（id）
     tools: { rod: 0, net: 0, hoe: 0, can: 0 },  // rod は つよさ（0 なし・1 ぼろい・2 ふつう）
+    parts: { legs: 0, arm: 0, sensor: 0 },      // ロボの パーツの lv（PARTS）
     sel: null,                                  // てに もっている もの（'rod' 'hoe' 'can' 'seed:turnip' …）
     items: {},                                  // うれる もの（ITEMS の id → かず）
     seeds: {},                                  // たね（CROPS の id → かず）
@@ -71,19 +75,20 @@ function newSave() {
     tidy: { stored: [], carry: null },          // しまった がらくた・いま もっている がらくた
     plots: {},                                  // はたけ 'x,y' → { w: みずを あげた, c: { id, d: そだった ひ } }
     cleared: [],                                // かりとった くさ・いし 'x,y'
-    flags: {},
-    pos: { map: 'house', x: 6, y: 6, dir: 'down' },
+    flags: {},                                  // awake：かみなりで めを さました
+    pos: { map: 'house', x: 5, y: 3, dir: 'up' }, // じゅうでんきの まえで とまっている
     totals: { fish: 0, harvest: 0, earned: 0 },
   };
 }
 
 function loadSave(id) {
   const s = Store.get(KEY.save(id), null);
-  if (!s || s.v !== 1) return null;
+  if (!s || s.v !== SAVE_V) return null;
   const base = newSave();
   return {
     ...base, ...s,
     tools: { ...base.tools, ...s.tools },
+    parts: { ...base.parts, ...s.parts },
     tidy: { ...base.tidy, ...s.tidy },
     totals: { ...base.totals, ...s.totals },
     pos: { ...base.pos, ...s.pos },
@@ -96,7 +101,7 @@ function writeSave(id, s) {
   return Store.set(KEY.save(id), s);
 }
 
-// とどいた げんきを とりこむ。とりこんだ ぶんの リストを かえす
+// とどいた でんちを とりこむ。とりこんだ ぶんの リストを かえす
 function pullGrants(id, s) {
   const grants = Store.get(KEY.grants(id), []);
   if (!Array.isArray(grants)) return [];

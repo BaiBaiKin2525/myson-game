@@ -1,17 +1,18 @@
 'use strict';
 // ゲームの ほんたい：うごく・かたづける・つる・たがやす・ねる・かう・うる
+// おはなし：だれも いなくなった さびれた むらに、ロボが ひとり のこされて とまっていた。
+// さんすうアプリで さいしょの じつりょくテストを やると、かみなりが おちて じゅうでんきに でんきが ながれ、ロボが めを さます
 
 const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const pickOne = (a) => a[(Math.random() * a.length) | 0];
 
 const G = {
   save: null, pid: null, profile: null,
   maps: {}, map: null, p: null,
   time: 0, scale: 3, cw: 0, ch: 0, canvas: null, ctx: null,
   fishing: null, busy: false, pendingA: false,
-  dirs: [], fx: [], splash: null,
+  dirs: [], fx: [], splash: null, bolt: null, waking: false,
   saveT: 0, grantT: 0,
   dev: /[?&]dev=1/.test(location.search), infinite: false,
 };
@@ -46,7 +47,7 @@ function showTitle() {
   const cur = currentProfileId();
   for (const p of loadProfiles()) {
     const s = loadSave(p.id);
-    const sub = s ? `${s.day}にちめ ・ ⚡${s.stamina}` : 'はじめから';
+    const sub = !s ? 'はじめから' : s.flags.awake ? `${s.day}にちめ ・ 🔋${s.stamina}` : 'とまっている…';
     const b = el('button', `prof${p.id === cur ? ' cur' : ''}`, `<span class="pi">${esc(p.icon || '🙂')}</span><span class="pn">${esc(p.name)}</span><span class="ps">${sub}</span>`);
     b.onclick = () => {
       Sfx.init();
@@ -66,25 +67,65 @@ function startGame(p) {
   const pos = G.save.pos;
   const m = G.maps[pos.map] ? pos.map : 'house';
   if (walkable(G.maps[m], pos.x, pos.y)) setMap(m, pos.x, pos.y, pos.dir);
-  else setMap('house', 6, 6, 'down');
+  else setMap('house', 5, 3, 'up');
   $('title').classList.add('hidden');
   $('play').classList.remove('hidden');
+  $('offMath').href = CFG.mathUrl;
   UI.hud();
   UI.hotbar();
-  checkGrants();
   persist();
-  if (!G.save.flags.intro) {
+  checkGrants();
+  if (!G.save.flags.awake && !G.waking) {
+    // まだ とまっている：おはなしの はじまり。じつりょくテストの かみなりを まつ
     UI.say([
-      'ここは おじいちゃんが のこして くれた いえ。',
-      'ながい あいだ だれも すんで いなかったから、ほこりだらけ…',
-      'まずは かたづけから はじめよう！',
+      'ここは だれも いなく なった、さびれた むら。',
+      'はかせの いえの すみで、1だいの ロボが とまって いた。',
+      'じゅうでんきは こわれて いて、でんち🔋は からっぽ…',
+      '（さんすうアプリで「じつりょくテスト」を やると… なにかが おきるかも！）',
+    ], () => UI.offNote(!G.save.flags.awake && !G.waking));
+  }
+}
+
+// かみなりが おちて じゅうでん！ big：はじめて めを さます とき
+function strike(big) {
+  G.bolt = { t: 0, big };
+  Sfx.play('thunder');
+  $('flash').classList.remove('on');
+  void $('flash').offsetWidth;
+  $('flash').classList.add('on');
+  try { navigator.vibrate && navigator.vibrate(big ? [60, 40, 120] : 60); } catch { /* なし */ }
+}
+
+// さいしょの じつりょくテスト（または デバッグの むせいげん）で めを さます
+function wakeUp(added) {
+  const s = G.save;
+  G.waking = true;
+  G.busy = true;
+  UI.offNote(false);
+  if (UI.dialogOpen()) UI.close();
+  strike(true);
+  setTimeout(() => strike(true), 700);
+  setTimeout(() => {
+    G.waking = false;
+    G.busy = false;
+    if (G.save !== s) return; // とちゅうで タイトルに もどった
+    s.flags.awake = true;
+    persist();
+    UI.hud();
+    Sfx.play('boot');
+    UI.say([
+      'ピカッ！！ ゴロゴロ…！',
+      'やねの アンテナに かみなりが おちた！\nじゅうでんきに でんきが ながれこむ…',
+      `ピピッ… でんち🔋 じゅうでん ${unlimitedStamina() ? '∞' : added}。\nロボ、きどう します。`,
+      'ここは… はかせの いえ？\nはかせは… いない みたい。',
+      'いえの なかは がらくただらけ。\nまずは かたづけから はじめよう！',
       'がらくたの まえで Ⓐボタン を おすと もちあげられるよ。\nたんす まで はこんで、もういちど Ⓐ で しまおう。',
-      'うごく どうぐを つかったり、ものを もちあげると げんき⚡ が へるよ。\nげんきは さんすうアプリの「じつりょくテスト」を やると ふえるよ！',
+      'うごいたり ものを もつと でんち🔋が へるよ。\nさんすうアプリで「じつりょくテスト」を やると、また かみなりで じゅうでん できるよ！',
     ], () => {
-      G.save.flags.intro = true;
+      s.flags.intro = true;
       persist();
     });
-  }
+  }, 1700);
 }
 
 function setMap(id, x, y, dir) {
@@ -108,7 +149,7 @@ function backToTitle() {
   showTitle();
 }
 
-// ---------- げんき ----------
+// ---------- でんち ----------
 
 function spend(n) {
   const s = G.save;
@@ -117,30 +158,34 @@ function spend(n) {
     Sfx.play('err');
     UI.flashStamina();
     UI.say([
-      'ふぅ… つかれちゃった。げんき⚡が たりないよ。',
-      'さんすうアプリで「じつりょくテスト」を がんばると、げんきが もどるよ！',
+      'ピピ… でんち🔋が たりない。うごけないよ…',
+      'さんすうアプリで「じつりょくテスト」を がんばると、かみなりが おちて じゅうでん できるよ！',
     ]);
     return false;
   }
   s.stamina -= n;
   UI.hud();
-  addFx(`-${n}⚡`, '#ffe36a');
+  addFx(`-${n}🔋`, '#7dff9a');
   return true;
 }
 
-// さんすうアプリから とどいた げんきを とりこむ
+// さんすうアプリから とどいた でんちを とりこむ（とどくと かみなりが おちる）
 function checkGrants() {
-  if (!G.save) return;
+  if (!G.save || G.waking) return;
   const got = pullGrants(G.pid, G.save);
-  if (!got.length) return;
   const added = got.reduce((a, g) => a + g.added, 0);
+  if (!G.save.flags.awake) {
+    if (got.length || unlimitedStamina()) wakeUp(added);
+    return;
+  }
+  if (!got.length) return;
   const sent = got.reduce((a, g) => a + g.amount, 0);
   persist();
   UI.hud();
   UI.flashStamina();
-  Sfx.play('power');
+  strike(false);
   const reason = got[got.length - 1].reason || 'じつりょくテスト';
-  UI.toast(`${reason}の けっか！ げんき⚡ +${added}${added < sent ? '（いっぱいに なった！）' : ''}`, 3500);
+  UI.toast(`${reason}の かみなりで じゅうでん！ 🔋 +${added}${added < sent ? '（いっぱいに なった！）' : ''}`, 3500);
 }
 
 // ---------- にゅうりょく ----------
@@ -230,8 +275,9 @@ function setupInput() {
     pressA();
   });
   $('panelClose').onclick = () => { Sfx.play('ui'); UI.closePanel(); };
-  $('bagBtn').onclick = () => { Sfx.init(); if (canControl()) openBag(); };
-  $('menuBtn').onclick = () => { Sfx.init(); if (canControl()) openMenu(); };
+  // もちもの・メニューは ロボが とまっていても ひらける（さんすうアプリへ もどれる ように）
+  $('bagBtn').onclick = () => { Sfx.init(); if (canOpen()) openBag(); };
+  $('menuBtn').onclick = () => { Sfx.init(); if (canOpen()) openMenu(); };
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) persist();
@@ -240,7 +286,7 @@ function setupInput() {
   addEventListener('focus', checkGrants);
   addEventListener('storage', (e) => {
     if (G.pid && e.key === KEY.grants(G.pid)) checkGrants();
-    if (e.key === KEY.unlimited) UI.hud();
+    if (e.key === KEY.unlimited) { UI.hud(); checkGrants(); }
   });
   addEventListener('pagehide', persist);
 }
@@ -254,13 +300,14 @@ function releaseDir(src) {
 }
 const inputDir = () => (G.dirs.length ? G.dirs[G.dirs.length - 1].d : null);
 
-const canControl = () => !!G.save && !G.busy && !UI.dialogOpen() && !UI.panelOpen && !UI.catchOpen && !G.fishing;
+const canOpen = () => !!G.save && !G.busy && !UI.dialogOpen() && !UI.panelOpen && !UI.catchOpen && !G.fishing;
+const canControl = () => canOpen() && !!G.save.flags.awake;
 
 function pressA() {
   if (!G.save) return;
   if (UI.catchOpen) { UI.closeCatch(); return; }
   if (UI.dialogOpen()) { UI.advance(); return; }
-  if (UI.panelOpen || G.busy) return;
+  if (UI.panelOpen || G.busy || !G.save.flags.awake) return;
   if (G.fishing) { fishPress(); return; }
   if (G.p.moving) { G.pendingA = true; return; }
   doAction();
@@ -280,7 +327,7 @@ function update(dt) {
   if (!G.save) return;
   const p = G.p;
   if (p.moving) {
-    p.t += dt * CFG.walkSpeed;
+    p.t += dt * partFx('walk', 'legs');
     if (p.t >= 1) {
       p.x = p.tx;
       p.y = p.ty;
@@ -318,10 +365,20 @@ function update(dt) {
     G.splash.t += dt;
     if (G.splash.t > 0.5) G.splash = null;
   }
+  if (G.bolt) {
+    G.bolt.t += dt;
+    if (G.bolt.t > 0.9) G.bolt = null;
+  }
   G.saveT += dt;
   if (G.saveT > 15) { G.saveT = 0; persist(); }
   G.grantT += dt;
   if (G.grantT > 4) { G.grantT = 0; checkGrants(); UI.hud(); }
+}
+
+// パーツの lv に あわせた ちから（PART_FX の ならびより lv が たかい ときは いちばん うえ）
+function partFx(fx, part) {
+  const list = PART_FX[fx];
+  return list[Math.min(list.length - 1, G.save.parts[part] || 0)];
 }
 
 function tryStep(d) {
@@ -380,10 +437,10 @@ function goThrough(door) {
         G.save.flags.outIntro = true;
         persist();
         UI.say([
-          'そとに でた！ いい てんき！',
+          'そとに でた！ むらは しーんと して いる…',
           'みぎの ほうに いけが ある。\nみずの まえで つりざおを えらんで Ⓐ！',
           'つった さかなは、いえの よこの「しゅっかばこ」で おかねに なるよ。',
-          'みちの さきには おみせも あるみたい。',
+          'みちの さきで、なにかが ネオンの ひかりで ひかって いる…',
         ]);
       }
     });
@@ -439,22 +496,25 @@ const ACT = {
       : `たんす。がらくたを ここに しまおう。（${n}/${CLUTTER.length}）`);
   },
   bed() {
-    UI.ask('ベッドだ。ねて あしたに する？\n（みずを あげた やさいが そだつよ。げんき⚡は もどらないよ）', ['ねる', 'まだ ねない'], (k) => {
+    UI.ask('はかせの ベッド。ロボは ここで スリープ モードに なる。\nスリープ して あしたに する？\n（みずを あげた やさいが そだつよ。でんち🔋は ふえないよ）', ['スリープ', 'まだ'], (k) => {
       if (k === 0) sleep();
     });
   },
-  stove() {
-    UI.say('ふるい かまど。おじいちゃんは ここで ごはんを つくって いたのかな。');
+  charger() {
+    UI.say([
+      'じゅうでんき。こわれて いて、ふだんは うごかない。',
+      'でも やねの アンテナに かみなりが おちると、でんきが ながれこむ みたい。\n（さんすうアプリの「じつりょくテスト」で かみなりが おちるよ）',
+    ]);
   },
   table() {
     UI.say([
       'テーブルの うえに しゃしんが ある。',
-      'おじいちゃんと、ちいさい ころの じぶんが うつって いる…',
-      G.save.flags.letter ? 'おじいちゃん、この いえを たいせつに するね！' : 'この いえを きれいに してあげよう！',
+      'はかせと、ぴかぴかだった ころの ロボが うつって いる…',
+      G.save.flags.letter ? 'はかせ、むらと はたけは まかせて！' : 'はかせの いえを きれいに しよう！',
     ]);
   },
   bin() { openSell(); },
-  stall() { talkGranny(); },
+  vend() { useVend(); },
   signFarm() { UI.say('「はたけ」\nくわで くさを かって、つちを たがやそう。\nたねを まいたら まいにち みずを あげよう。'); },
   signPond() { UI.say('「いけ」\nみずの まえで つりざおを つかおう。\nうきが しずんだら Ⓐ！'); },
 };
@@ -483,6 +543,10 @@ function storeClutter() {
 
 function giveMilestone(give) {
   const s = G.save;
+  if (give.startsWith('part:')) {
+    const k = give.slice(5);
+    s.parts[k] = Math.max(1, s.parts[k] || 0);
+  }
   if (give === 'rod') { s.tools.rod = Math.max(1, s.tools.rod); s.sel = 'rod'; }
   if (give === 'net') s.tools.net = 1;
   if (give === 'hoe') s.tools.hoe = 1;
@@ -533,6 +597,11 @@ function useHoe(tx, ty, o) {
     return;
   }
   if (o && o.t === 'rock') {
+    if ((s.parts.arm || 0) < PART_FX.rockArm) {
+      Sfx.play('err');
+      UI.say('うーん… いしが おもくて うごかない。\nもっと つよい うでの パーツが あれば…');
+      return;
+    }
     if (!spend(CFG.cost.rock)) return;
     removeObj(m, o);
     s.cleared.push(o.key);
@@ -656,9 +725,9 @@ function sleep() {
       fadeTo(0, () => {
         G.busy = false;
         Sfx.play('morning');
-        const lines = [`${s.day}にちめの あさ！ おはよう！`];
+        const lines = [`ピピッ… ${s.day}にちめの あさ。スリープ かいじょ！`];
         if (grown) lines.push(`みずを あげた やさいが そだったよ！${ready ? `\nしゅうかく できる やさいが ${ready}こ あるよ！` : ''}`);
-        if (s.stamina < 10) lines.push('げんき⚡が すくないね。\nさんすうアプリの「じつりょくテスト」で げんきを ためよう！');
+        if (s.stamina < 10 && !unlimitedStamina()) lines.push('でんち🔋が すくないね。\nさんすうアプリの「じつりょくテスト」で かみなりを おとして じゅうでん しよう！');
         UI.say(lines);
       }, 600);
     }, 1300);
@@ -748,7 +817,7 @@ function fishUpdate(dt) {
       cutinEvent(f, 'bite');
       try { navigator.vibrate && navigator.vibrate(80); } catch { /* なし */ }
     }
-  } else if (f.state === 'bite' && f.t > f.spec.bite) {
+  } else if (f.state === 'bite' && f.t > f.spec.bite + partFx('bite', 'sensor')) {
     endFishing(f.junk ? 'あれ？ なにかに ひっかかって いたのかな…' : 'あ… えさだけ とられちゃった');
   } else if (f.state === 'reel') {
     const u = (f.t * f.speed) % 2;
@@ -837,23 +906,23 @@ function endFishing(msg, caught = false) {
   }
 }
 
-// ---------- おみせ ----------
+// ---------- じどう はんばいき ----------
+// むらに ひとは いない。しゃべらない きかいが まだ うごいて いて、たねや どうぐを うって くれる
 
-function talkGranny() {
+function useVend() {
   const s = G.save;
-  const who = 'ポポばあちゃん';
-  const lines = [];
-  if (!s.flags.metGranny) {
-    s.flags.metGranny = true;
-    lines.push(
-      { who, text: 'おや、あんたが おじいさんの まごだね？\nわたしは となりの ポポ。よろしくね。' },
-      { who, text: 'うちでは タネや どうぐを うって いるよ。' },
-      { who, text: 'つった さかなや やさいは、いえの よこの「しゅっかばこ」に いれると おかねに なるよ。' },
-    );
-    if (!s.tools.can) lines.push({ who, text: 'はたけを やるなら じょうろが いるね。150G だよ。\nまずは つりで おかねを ためて ごらん。' });
-  } else {
-    lines.push({ who, text: pickOne(['いらっしゃい！ なにに するかい？', 'きょうも げんきだねえ！', 'はたけの ちょうしは どうだい？', 'いけの ぬしは おおきな ナマズ らしいよ。']) });
+  Sfx.play('beep');
+  if (s.flags.metVend) {
+    openShop();
+    return;
   }
+  s.flags.metVend = true;
+  const lines = [
+    'ピッ… ピピッ。ネオンが ちかちか ひかった。',
+    'じどう はんばいきが まだ うごいて いる！\nおかねを いれると、たねや どうぐが かえる みたい。',
+    'つった さかなや やさいは、いえの よこの「しゅっかばこ」に いれると おかねに なるよ。',
+  ];
+  if (!s.tools.can) lines.push('はたけを やるなら じょうろ（150G）が いるね。\nまずは つりで おかねを ためよう。');
   UI.say(lines, openShop);
 }
 
@@ -893,7 +962,7 @@ function afterBuy(msg) {
 }
 
 function openShop() {
-  UI.panel('ポポの おみせ', (box) => {
+  UI.panel('じどう はんばいき', (box) => {
     const s = G.save;
     box.appendChild(el('div', 'wallet', `${iconImg('coin', 'ic s')} もっている おかね <b>${s.money}G</b>`));
     if (!s.tools.can) {
@@ -995,7 +1064,7 @@ function openBag() {
   UI.panel('もちもの', (box) => {
     const s = G.save;
     const tabs = el('div', 'tabs');
-    for (const [k, label] of [['items', 'もちもの'], ['dex', 'さかな ずかん']]) {
+    for (const [k, label] of [['items', 'もちもの'], ['parts', 'ロボの パーツ'], ['dex', 'さかな ずかん']]) {
       const b = el('button', `tab${(G.bagTab || 'items') === k ? ' on' : ''}`, label);
       b.onclick = () => { G.bagTab = k; Sfx.play('ui'); UI.rebuild(); };
       tabs.appendChild(b);
@@ -1014,7 +1083,20 @@ function openBag() {
       box.appendChild(grid);
       return;
     }
-    box.appendChild(el('div', 'wallet', `⚡ げんき <b>${unlimitedStamina() ? '∞' : s.stamina}</b> / ${CFG.staminaMax}　${iconImg('coin', 'ic s')} <b>${s.money}G</b>`));
+    if (G.bagTab === 'parts') {
+      const top = el('div', 'robo');
+      top.innerHTML = `<img class="ic robo-img" src="${robotSpr('down', 0, s.parts, s.flags.awake).toDataURL()}" alt="">
+        <p class="help">パーツを つけると ロボが つよく なって、できる ことが ふえるよ。<br>もっと いい パーツは、これから たんけんで みつかるかも！</p>`;
+      box.appendChild(top);
+      for (const [k, p] of Object.entries(PARTS)) {
+        const lv = s.parts[k] || 0;
+        const row = el('div', `row${lv ? '' : ' weak'}`);
+        row.innerHTML = `${iconImg(`part_${k}`, 'ic m')}<div class="info"><div class="nm">${p.label}：${p.names[Math.min(lv, p.names.length - 1)]}</div><div class="ds">${p.does[Math.min(lv, p.does.length - 1)]}${lv ? '' : '（はじめから ついている ぼろぼろの パーツ）'}</div></div><div class="pr">Lv ${lv}</div>`;
+        box.appendChild(row);
+      }
+      return;
+    }
+    box.appendChild(el('div', 'wallet', `🔋 でんち <b>${unlimitedStamina() ? '∞' : s.stamina}</b> / ${CFG.staminaMax}　${iconImg('coin', 'ic s')} <b>${s.money}G</b>`));
     const grid = el('div', 'grid');
     const cell = (icon, name, n) => {
       const c = el('div', 'cell', `${iconImg(icon, 'ic m')}${n != null ? `<b>${n}</b>` : ''}<span>${name}</span>`);
@@ -1039,7 +1121,7 @@ function openMenu() {
       box.appendChild(b);
     };
     box.appendChild(el('p', 'help', `<b>${esc(G.profile.name)}</b> ・ ${s.day}にちめ<br>つった さかな ${s.totals.fish}ひき ・ しゅうかく ${s.totals.harvest}こ ・ かせいだ おかね ${s.totals.earned}G`));
-    box.appendChild(el('p', 'help', '⚡ げんきは、さんすうアプリの「じつりょくテスト」の てんすう ぶん ふえるよ。<br>うごいたり、どうぐを つかうと へるよ。ねても もどらないよ。'));
+    box.appendChild(el('p', 'help', '🔋 でんちは、さんすうアプリの「じつりょくテスト」を やると かみなりが おちて、てんすう ぶん じゅうでん されるよ。<br>うごいたり、どうぐを つかうと へるよ。スリープ しても ふえないよ。'));
     add(Sfx.mute ? '🔇 おと：なし' : '🔊 おと：あり', () => { Sfx.mute = !Sfx.mute; UI.rebuild(); });
     add('👪 こどもを かえる', () => backToTitle());
     add('🧮 さんすうアプリに もどる', () => {
@@ -1048,16 +1130,16 @@ function openMenu() {
     });
     if (G.dev) {
       box.appendChild(el('p', 'help', 'おとな（テスト）メニュー'));
-      add('⚡ げんきを 50 とどける（じつりょくテストの かわり）', () => { grantGameStamina(G.pid, 50, 'テスト'); UI.closePanel(); checkGrants(); });
+      add('⚡ かみなりで でんちを 50 とどける（じつりょくテストの かわり）', () => { grantGameStamina(G.pid, 50, 'テスト'); UI.closePanel(); checkGrants(); });
       add('🪙 +500G', () => { s.money += 500; UI.hud(); persist(); UI.rebuild(); });
-      add(G.infinite ? '⚡ げんき むげん：オン' : '⚡ げんき むげん：オフ', () => { G.infinite = !G.infinite; UI.hud(); UI.rebuild(); });
+      add(G.infinite ? '🔋 でんち むげん：オン' : '🔋 でんち むげん：オフ', () => { G.infinite = !G.infinite; UI.hud(); UI.rebuild(); });
       add('🧹 いえを ぜんぶ かたづける', () => {
         while (s.tidy.stored.length < CLUTTER.length) {
           const c = CLUTTER.find((x) => !s.tidy.stored.includes(x.id));
           s.tidy.stored.push(c.id);
         }
         s.tidy.carry = null;
-        for (const g of ['rod', 'net', 'hoe', 'letter']) giveMilestone(g);
+        for (const ms of Object.values(MILESTONES)) giveMilestone(ms.give);
         G.maps.house = buildHouse(s);
         bakeGround(G.maps.house);
         if (G.map.id === 'house') G.map = G.maps.house;
@@ -1082,8 +1164,8 @@ function openMenu() {
 
 // ものの かげ（よこの はんけい・たての はんけい）
 const SHADOW = {
-  tree: [24, 6], bush: [15, 4], rock: [12, 3], stall: [44, 5], bin: [28, 4], sign: [9, 3],
-  clutter: [12, 3], reed: [6, 2], table: [28, 4], closet: [30, 3], stove: [30, 3], bed: [30, 3],
+  tree: [24, 6], bush: [15, 4], rock: [12, 3], vend: [30, 4], bin: [28, 4], sign: [9, 3],
+  clutter: [12, 3], reed: [6, 2], table: [28, 4], closet: [30, 3], charger: [30, 3], bed: [30, 3],
 };
 
 function resize() {
@@ -1194,6 +1276,7 @@ function render() {
 
   if (G.fishing) drawFishing(g, ppx, ppy);
   if (canControl() && !p.moving && G.save.flags.intro) drawCursor(g);
+  if (G.bolt) drawBolt(g, ppx + T / 2, ppy + 6, cy);
 
   g.font = 'bold 12px sans-serif';
   g.textAlign = 'center';
@@ -1209,6 +1292,11 @@ function render() {
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.fillStyle = G.light;
   g.fillRect(0, 0, G.cw, G.ch);
+  // ロボが とまっている あいだは くらい
+  if (!G.save.flags.awake) {
+    g.fillStyle = 'rgba(8,6,24,.55)';
+    g.fillRect(0, 0, G.cw, G.ch);
+  }
   // かたづけるほど いえが あかるく なる
   if (m.id === 'house') {
     const n = G.save.tidy.stored.length;
@@ -1233,9 +1321,15 @@ function drawPlayer(g, x, y) {
   const p = G.p;
   const f = p.moving ? (p.t < 0.5 ? 1 : 2) : 0;
   const bob = p.moving && p.t >= 0.25 && p.t < 0.75 ? -1 : 0;
-  const spr = SP[`p_${p.dir}_${f}`];
+  const on = !!G.save.flags.awake;
+  const spr = robotSpr(p.dir, f, G.save.parts, on);
   const px = Math.round(x + (T - spr.width) / 2), py = Math.round(y + T - spr.height + 2) + bob;
   g.drawImage(spr, px, py);
+  // めの ひかり（ネオン）
+  if (on && p.dir !== 'up') {
+    g.fillStyle = `rgba(95,246,255,${0.18 + 0.08 * Math.sin(G.time * 4)})`;
+    g.fillRect(px + (p.dir === 'down' ? 9 : p.dir === 'right' ? 19 : 8), py + 13, p.dir === 'down' ? 16 : 7, 7);
+  }
   if (G.save.tidy.carry) {
     const c = CLUTTER.find((q) => q.id === G.save.tidy.carry);
     const cs = SP[`c_${c.kind}`];
@@ -1284,6 +1378,32 @@ function drawFishing(g, ppx, ppy) {
     }
   } else {
     g.drawImage(SP.bobber, Math.round(bx - 4), Math.round(by - 5));
+  }
+}
+
+// かみなり：がめんの うえ から ロボへ ギザギザに おちる（まいかい すこし かたちが かわる）
+function drawBolt(g, x, y, top) {
+  const b = G.bolt;
+  if (b.t > 0.55 || (b.t > 0.2 && b.t < 0.3)) return;
+  const r = RNG(Math.floor(G.time * 30));
+  const pts = [];
+  const n = 9;
+  for (let i = 0; i <= n; i++) {
+    const k = i / n;
+    pts.push([x + (i === n ? 0 : (r() - 0.5) * 26), top + (y - top) * k]);
+  }
+  for (const [w, col] of [[7, 'rgba(255,79,216,.45)'], [4, 'rgba(95,246,255,.85)'], [2, '#ffffff']]) {
+    g.strokeStyle = col;
+    g.lineWidth = w;
+    g.lineJoin = 'round';
+    g.beginPath();
+    pts.forEach(([px, py], i) => (i ? g.lineTo(px, py) : g.moveTo(px, py)));
+    g.stroke();
+  }
+  g.fillStyle = 'rgba(255,255,255,.7)';
+  for (let i = 0; i < 8; i++) {
+    const a = i * 0.8 + G.time * 9;
+    R(g, i % 2 ? '#5ff6ff' : '#ffffff', Math.round(x + Math.cos(a) * 12), Math.round(y + 20 + Math.sin(a) * 5), 2, 2);
   }
 }
 

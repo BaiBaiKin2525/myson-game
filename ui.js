@@ -75,6 +75,11 @@ const Sfx = {
         morning: () => [392, 523, 659, 784].forEach((f, i) => this.tone(f, 0.2, 'triangle', 0.15, i * 0.12)),
         door: () => this.tone(240, 0.1, 'triangle', 0.2, 0, 180),
         power: () => [523, 659, 784, 1046, 1319].forEach((f, i) => this.tone(f, 0.12, 'square', 0.08, i * 0.06)),
+        // かみなり：バリッ と ゴロゴロ
+        thunder: () => { this.noise(0.25, 0.45); this.tone(90, 1.2, 'sawtooth', 0.12, 0.05, 40); this.noise(0.9, 0.18, 0.2); },
+        // ロボが きどう する
+        boot: () => [262, 392, 523, 784, 1046].forEach((f, i) => this.tone(f, 0.16, 'square', 0.07, i * 0.1)),
+        beep: () => { this.tone(1320, 0.06, 'square', 0.06); this.tone(1760, 0.08, 'square', 0.06, 0.08); },
       };
       if (S[name]) S[name]();
     } catch { /* おとが でなくても あそべる */ }
@@ -147,6 +152,10 @@ function closeDialog() {
 }
 
 UI.dialogOpen = () => Dlg.open;
+UI.close = closeDialog;
+
+// ロボが とまっている ときの おしらせ（さんすうアプリへの ボタン つき）
+UI.offNote = (show) => $('offNote').classList.toggle('hidden', !show);
 
 UI.advance = () => {
   if (!Dlg.open) return;

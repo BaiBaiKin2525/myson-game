@@ -569,70 +569,56 @@ function houseSprite() {
   }, '#3a2010');
 }
 
-function grannySprite() {
-  return outline(make(30, 30, (g) => {
-    E(g, '#e8e8e8', 15, 4, 5, 4);
-    R(g, '#f4f4f4', 13, 1, 3, 2);
-    E(g, '#dcdcdc', 15, 10, 9, 5);
-    E(g, '#f6cfa6', 15, 14, 8, 7);
-    R(g, '#f0f0f0', 7, 8, 16, 3);
-    R(g, '#2b1d12', 10, 13, 3, 1);
-    R(g, '#2b1d12', 17, 13, 3, 1);
-    R(g, '#2b1d12', 9, 12, 1, 1);
-    R(g, '#2b1d12', 13, 12, 1, 1);
-    R(g, '#2b1d12', 16, 12, 1, 1);
-    R(g, '#2b1d12', 20, 12, 1, 1);
-    R(g, '#f19a8a', 8, 16, 3, 2);
-    R(g, '#f19a8a', 19, 16, 3, 2);
-    R(g, '#b5584a', 13, 18, 4, 1);
-    R(g, '#8a4a7a', 4, 21, 22, 9);
-    R(g, '#a35f92', 4, 21, 22, 2);
-    R(g, '#f4ead0', 10, 23, 10, 7);
-  }), '#3a2010');
-}
-
 function buildBuildings() {
   SP.house = houseSprite();
-  const gr = grannySprite();
-  SP.stall = osp(100, 96, (g) => {
-    const w1 = '#9a6638', w2 = '#c08a52', w3 = '#7a4b28';
-    R(g, w3, 6, 22, 5, 72);
-    R(g, w2, 6, 22, 2, 72);
-    R(g, w3, 89, 22, 5, 72);
-    R(g, w2, 89, 22, 2, 72);
-    g.drawImage(gr, 35, 24);
-    R(g, w1, 2, 60, 96, 34);
-    for (let x = 6; x < 98; x += 9) R(g, w3, x, 64, 1, 30);
-    R(g, w2, 0, 56, 100, 6);
-    R(g, '#d8a46a', 0, 56, 100, 1);
-    R(g, w3, 0, 61, 100, 1);
-    const crate = (cx, items) => {
-      R(g, '#b5854a', cx, 46, 26, 11);
-      R(g, '#8a5f30', cx, 50, 26, 1);
-      R(g, '#d8a46a', cx, 46, 26, 1);
-      for (const [ix, iy, c, hc] of items) {
-        E(g, c, cx + ix, 44 + iy, 3, 3);
-        R(g, hc, cx + ix - 1, 42 + iy, 1, 1);
+  // じどう はんばいき（ひとが いなく なっても まだ うごいている。ネオンが ひかる）
+  SP.vend = osp(62, 84, (g) => {
+    R(g, '#1b1d30', 2, 4, 58, 76);
+    R(g, '#2a2d48', 4, 4, 54, 74);
+    R(g, '#3a3e60', 4, 4, 3, 74);
+    // ネオンの かんばん
+    R(g, '#0d0e1c', 6, 7, 50, 11);
+    R(g, '#ff4fd8', 6, 7, 50, 1);
+    R(g, '#ff4fd8', 6, 17, 50, 1);
+    for (const [x, w] of [[10, 6], [18, 4], [24, 8], [34, 5], [41, 10]]) R(g, '#5ff6ff', x, 11, w, 3);
+    R(g, '#c8fbff', 10, 11, 2, 1);
+    // ガラスの なか（たね・どうぐの はこ）
+    R(g, '#081a26', 7, 21, 34, 38);
+    for (let row = 0; row < 3; row++) {
+      const y = 23 + row * 12;
+      R(g, '#5ff6ff', 7, y + 10, 34, 1);
+      for (let k = 0; k < 4; k++) {
+        const c = ['#e2392c', '#ffd23f', '#7dff9a', '#ff4fd8', '#e98a24', '#9b8cff'][(row * 4 + k) % 6];
+        R(g, c, 9 + k * 8, y + 2, 6, 8);
+        R(g, shade(c, 0.4), 9 + k * 8, y + 2, 6, 2);
+        R(g, '#ffffff', 10 + k * 8, y + 5, 3, 1);
       }
-    };
-    crate(6, [[5, 0, '#f2ecf4', '#ffffff'], [12, -1, '#f2ecf4', '#ffffff'], [19, 0, '#f2ecf4', '#ffffff'], [8, -4, '#9b4cb5', '#c98ae0'], [16, -4, '#9b4cb5', '#c98ae0']]);
-    crate(68, [[5, 0, '#e2392c', '#ffb0a0'], [12, -1, '#e2392c', '#ffb0a0'], [19, 0, '#e98a24', '#ffd0a0'], [9, -4, '#e2392c', '#ffb0a0'], [16, -4, '#e98a24', '#ffd0a0']]);
-    for (let i = 0; i < 3; i++) {
-      const px = 37 + i * 9;
-      R(g, '#f4ead0', px, 50, 7, 7);
-      R(g, ['#9b4cb5', '#e2781e', '#e2392c'][i], px, 50, 7, 2);
-      R(g, '#a88a5a', px, 56, 7, 1);
     }
-    R(g, '#9a2f24', 0, 2, 100, 4);
-    for (let i = 0; i < 9; i++) {
-      const sx = 2 + i * 11;
-      const red = i % 2 === 0;
-      R(g, red ? '#d94c3d' : '#f6efe2', sx, 6, 11, 18);
-      R(g, red ? '#b73a2d' : '#e2d6c2', sx, 20, 11, 4);
-      E(g, red ? '#d94c3d' : '#f6efe2', sx + 5, 25, 5, 3);
-      R(g, red ? '#ef6a5a' : '#ffffff', sx, 6, 11, 2);
+    for (let i = 0; i < 12; i++) R(g, 'rgba(200,240,255,.35)', 10 + i, 22 + i * 3, 1, 2);
+    // ボタン・コインの いれぐち・がめん
+    R(g, '#14162a', 44, 21, 12, 38);
+    R(g, '#7dff9a', 46, 23, 8, 5);
+    R(g, '#c8ffd6', 47, 24, 3, 1);
+    for (let k = 0; k < 4; k++) {
+      R(g, k % 2 ? '#5ff6ff' : '#ffd23f', 46, 31 + k * 5, 3, 3);
+      R(g, k % 2 ? '#ff4fd8' : '#5ff6ff', 51, 31 + k * 5, 3, 3);
     }
-  }, '#3a2010');
+    R(g, '#000000', 49, 52, 2, 5);
+    R(g, '#6a7088', 48, 51, 4, 1);
+    // とりだしぐち
+    R(g, '#08090f', 9, 63, 44, 9);
+    R(g, '#3a3e60', 9, 63, 44, 1);
+    R(g, '#5ff6ff', 9, 72, 44, 1);
+    // さび・よごれ・ネオンの ふち
+    for (const [x, y] of [[6, 40], [54, 66], [13, 74], [48, 9], [30, 60]]) {
+      R(g, '#7a4a2a', x, y, 2, 1);
+      R(g, '#9a5a32', x + 1, y + 1, 1, 1);
+    }
+    R(g, '#5ff6ff', 2, 4, 1, 76);
+    R(g, '#ff4fd8', 59, 4, 1, 76);
+    R(g, '#14162a', 4, 78, 8, 6);
+    R(g, '#14162a', 50, 78, 8, 6);
+  }, '#07080f');
   SP.bin = osp(62, 44, (g) => {
     R(g, '#9a6638', 3, 12, 56, 30);
     for (let x = 10; x < 58; x += 10) R(g, '#7a4b28', x, 12, 1, 30);
@@ -690,23 +676,37 @@ function buildBuildings() {
     R(g, '#4a2f1a', 2, 72, 6, 6);
     R(g, '#4a2f1a', 54, 72, 6, 6);
   }, '#2e1c10');
-  SP.stove = osp(62, 58, (g) => {
-    R(g, '#8a7e70', 0, 18, 62, 40);
-    R(g, '#a0968a', 0, 18, 62, 3);
-    for (let y = 24; y < 56; y += 7) for (let x = (y / 7) % 2 ? 0 : 6; x < 62; x += 12) R(g, '#7a6f62', x, y, 1, 6);
-    for (let y = 24; y < 56; y += 7) R(g, '#7a6f62', 0, y, 62, 1);
-    for (const x of [8, 36]) {
-      R(g, '#2b2420', x, 34, 18, 18);
-      E(g, '#2b2420', x + 9, 34, 9, 5);
-      R(g, '#e8823a', x + 4, 46, 10, 3);
-      R(g, '#ffc26a', x + 7, 46, 4, 2);
+  // ロボの じゅうでんき（こわれかけ。やねの アンテナから ケーブルが きている）
+  SP.charger = osp(62, 62, (g) => {
+    R(g, '#2b2f36', 27, 0, 4, 20);
+    R(g, '#3d434c', 28, 0, 1, 20);
+    R(g, '#3d434c', 2, 18, 58, 42);
+    R(g, '#5d6470', 4, 18, 54, 38);
+    R(g, '#8a929e', 4, 18, 54, 3);
+    R(g, '#4a5058', 4, 52, 54, 4);
+    // がめん（でんちの マーク）
+    R(g, '#0d1418', 9, 25, 26, 20);
+    R(g, '#5ff6ff', 12, 30, 17, 10);
+    R(g, '#0d1418', 13, 31, 15, 8);
+    R(g, '#5ff6ff', 29, 33, 2, 4);
+    R(g, '#3a5a60', 14, 32, 4, 6);
+    // かみなりの マーク
+    for (let y = 24; y <= 42; y++) {
+      const t = (y - 24) / 18;
+      const x = Math.round(48 - t * 6 + (y > 31 && y < 34 ? 3 : 0));
+      R(g, '#ffd23f', x, y, 3, 1);
     }
-    E(g, '#3a3532', 22, 12, 14, 8);
-    E(g, '#55504c', 20, 10, 10, 4);
-    R(g, '#2a2626', 8, 16, 28, 3);
-    R(g, '#3a3532', 34, 8, 8, 3);
-    R(g, '#3a3532', 18, 1, 8, 3);
-  }, '#2a2420');
+    R(g, '#fff4a0', 46, 25, 1, 5);
+    // ケーブル と プラグ
+    R(g, '#2b2f36', 56, 40, 4, 18);
+    R(g, '#2b2f36', 40, 56, 20, 4);
+    R(g, '#8a929e', 36, 55, 5, 6);
+    // さび
+    for (const [x, y] of [[6, 47], [33, 22], [52, 49], [18, 49]]) {
+      R(g, '#7a4a2a', x, y, 3, 2);
+      R(g, '#c07a44', x, y, 1, 1);
+    }
+  }, '#11141c');
   SP.table = osp(62, 46, (g) => {
     R(g, '#6e4626', 4, 18, 6, 28);
     R(g, '#6e4626', 52, 18, 6, 28);
@@ -869,131 +869,188 @@ function buildBuildings() {
   }), '#2b1a0e');
 }
 
-// ---------- しゅじんこう（むぎわら ぼうし と オーバーオール） ----------
+// ---------- しゅじんこう（ロボ。パーツで みためが かわる） ----------
 
-const PC = {
-  skin: '#f7d1a8', skinD: '#e3b088', hat: '#efcb5e', hatD: '#c99a36', hatL: '#fbe18e', band: '#c0392b', bandL: '#e05a48',
-  hair: '#6a4426', hairD: '#4f311a', shirt: '#fbf3e0', shirtD: '#e4d8bc', ov: '#3f74b8', ovD: '#2c578f', ovL: '#5a90d0', shoe: '#5a3a22', shoeL: '#7a5236', eye: '#2b1d12',
+const RC = {
+  body: '#6f9a94', bodyD: '#4a6f6a', bodyL: '#9cc7bf', rust: '#9a5a32', rustL: '#c07a44',
+  metal: '#8a929e', metalD: '#5d6470', metalL: '#b4bcc6', visor: '#18222b', panel: '#2a333c',
+  eyeOn: '#5ff6ff', eyeOff: '#3d4a52', pink: '#ff4fd8', pinkOff: '#6a3a62', green: '#7dff9a', greenOff: '#3a5244',
+  tread: '#2e3238', treadL: '#4a5058', hazard: '#ffd23f',
 };
 
-function hatFront(g) {
-  E(g, PC.hatD, 16, 13, 15, 3);
-  E(g, PC.hat, 16, 12, 15, 2);
-  for (let x = 3; x < 30; x += 3) R(g, PC.hatD, x, 12, 1, 1);
-  E(g, PC.hat, 16, 7, 8, 6);
-  R(g, PC.hat, 8, 8, 17, 4);
-  E(g, PC.hatL, 13, 4, 4, 2);
-  for (let y = 3; y < 11; y += 2) for (let x = 9 + (y % 4); x < 23; x += 4) R(g, PC.hatD, x, y, 1, 1);
-  R(g, PC.band, 8, 9, 17, 2);
-  R(g, PC.bandL, 8, 9, 17, 1);
-}
-
-function playerSprite(dir, f) {
+// dir：'down' 'up' 'side'（みぎむき）、f：0 とまる・1 2 あるく、parts：{ legs, arm, sensor }、on：めを さましている
+function robotSprite(dir, f, parts, on) {
   return osp(32, 48, (g) => {
     const lu = f === 1 ? 1 : 0, ru = f === 2 ? 1 : 0;
-    if (dir === 'side') {
-      // みぎむき（ひだりは うらがえし）
-      const a = f === 1 ? -2 : f === 2 ? 2 : 0;
-      R(g, PC.ovD, 12 - a, 40, 5, 5);
-      R(g, PC.shoe, 11 - a, 44, 7, 4);
-      R(g, PC.ov, 15 + a, 40, 5, 5);
-      R(g, PC.shoe, 15 + a, 44, 8, 4);
-      R(g, PC.shoeL, 16 + a, 44, 6, 1);
-      R(g, PC.shirt, 10, 26, 13, 6);
-      R(g, PC.shirtD, 10, 26, 3, 6);
-      R(g, PC.ov, 10, 30, 13, 11);
-      R(g, PC.ovD, 10, 30, 3, 11);
-      R(g, PC.ovL, 20, 31, 2, 8);
-      R(g, PC.ov, 17, 26, 3, 5);
-      R(g, '#f2c94c', 18, 31, 2, 2);
-      R(g, PC.ovD, 13, 36, 7, 1);
-      const sw = f === 1 ? 2 : f === 2 ? -2 : 0;
-      R(g, PC.shirt, 14 + sw, 28, 5, 6);
-      R(g, PC.shirtD, 14 + sw, 33, 5, 1);
-      R(g, PC.skin, 15 + sw, 34, 4, 3);
-      // あたま
-      R(g, PC.hair, 7, 13, 9, 11);
-      E(g, PC.skin, 18, 18, 8, 7);
-      R(g, PC.skin, 25, 18, 2, 3);
-      R(g, PC.skinD, 12, 23, 10, 2);
-      R(g, PC.hair, 8, 13, 6, 9);
-      R(g, PC.hairD, 8, 20, 4, 2);
-      E(g, PC.skinD, 13, 19, 2, 2);
-      R(g, PC.eye, 21, 16, 2, 4);
-      R(g, '#ffffff', 21, 16, 1, 1);
-      R(g, '#f39a8a', 19, 21, 3, 2);
-      R(g, '#c9705a', 24, 22, 2, 1);
-      hatFront(g);
-      return;
-    }
+    const eye = on ? RC.eyeOn : RC.eyeOff;
+    const ball = on ? RC.pink : RC.pinkOff;
+    const side = dir === 'side';
+    const slump = on ? 0 : 1; // とまっている ときは あたまが すこし さがる
+
     // あし
-    R(g, PC.ov, 11, 40 - lu, 5, 5);
-    R(g, PC.shoe, 10, 44 - lu, 7, 4);
-    R(g, PC.ov, 17, 40 - ru, 5, 5);
-    R(g, PC.shoe, 16, 44 - ru, 7, 4);
-    R(g, PC.shoeL, 11, 44 - lu, 5, 1);
-    R(g, PC.shoeL, 17, 44 - ru, 5, 1);
-    // うで
-    R(g, PC.shirt, 6, 27 + ru, 4, 8);
-    R(g, PC.skin, 6, 34 + ru, 4, 3);
-    R(g, PC.shirt, 23, 27 + lu, 4, 8);
-    R(g, PC.shirtD, 25, 27 + lu, 2, 8);
-    R(g, PC.skin, 23, 34 + lu, 4, 3);
-    // からだ
-    R(g, PC.shirt, 9, 25, 15, 6);
-    R(g, PC.shirtD, 21, 25, 3, 6);
-    R(g, PC.ov, 9, 30, 15, 11);
-    R(g, PC.ovD, 21, 30, 3, 11);
-    R(g, PC.ovL, 10, 31, 2, 8);
-    R(g, PC.ovD, 9, 40, 15, 1);
-    if (dir === 'down') {
-      R(g, PC.ov, 11, 27, 11, 4);
-      R(g, PC.ov, 11, 25, 2, 3);
-      R(g, PC.ov, 20, 25, 2, 3);
-      R(g, '#f2c94c', 12, 29, 2, 2);
-      R(g, '#f2c94c', 19, 29, 2, 2);
-      R(g, PC.ovD, 14, 33, 5, 3);
-      // かお
-      R(g, PC.hair, 8, 13, 17, 4);
-      R(g, PC.hair, 7, 14, 2, 8);
-      R(g, PC.hair, 24, 14, 2, 8);
-      E(g, PC.skin, 16, 19, 8, 6);
-      R(g, PC.skinD, 10, 24, 13, 1);
-      R(g, PC.hair, 9, 13, 15, 2);
-      R(g, PC.hairD, 12, 15, 2, 1);
-      R(g, PC.hairD, 18, 15, 3, 1);
-      R(g, PC.eye, 12, 18, 2, 3);
-      R(g, PC.eye, 19, 18, 2, 3);
-      R(g, '#ffffff', 12, 18, 1, 1);
-      R(g, '#ffffff', 19, 18, 1, 1);
-      R(g, '#f39a8a', 10, 21, 3, 1);
-      R(g, '#f39a8a', 20, 21, 3, 1);
-      R(g, '#c9705a', 15, 22, 3, 1);
-    } else {
-      // うしろ：つりひもが クロス
-      for (let i = 0; i < 6; i++) {
-        R(g, PC.ovD, 11 + i, 25 + i, 2, 1);
-        R(g, PC.ovD, 20 - i, 25 + i, 2, 1);
+    if (parts.legs >= 1) {
+      const xs = side ? [9] : [6, 18];
+      for (const x of xs) {
+        const w = side ? 15 : 8;
+        R(g, RC.tread, x, 38, w, 10);
+        R(g, RC.treadL, x, 38, w, 1);
+        for (let y = 40 + (f % 2); y < 47; y += 2) R(g, RC.treadL, x + 1, y, w - 2, 1);
+        R(g, RC.metal, x + 2, 41, 2, 2);
+        R(g, RC.metal, x + w - 4, 44, 2, 2);
       }
-      R(g, PC.ovD, 13, 34, 7, 2);
-      R(g, PC.hair, 8, 13, 17, 11);
-      R(g, PC.hairD, 10, 16, 1, 6);
-      R(g, PC.hairD, 15, 15, 1, 8);
-      R(g, PC.hairD, 20, 16, 1, 6);
-      R(g, PC.hairD, 8, 22, 17, 2);
-      R(g, PC.skinD, 12, 24, 9, 1);
+    } else {
+      R(g, RC.metalD, side ? 12 : 9, 37, side ? 9 : 15, 3);
+      const xs = side ? [16 + (f === 1 ? -1 : f === 2 ? 1 : 0)] : [11, 21];
+      for (const cx of xs) {
+        E(g, RC.tread, cx, 44, 3, 3);
+        E(g, RC.treadL, cx, 44, 1, 1);
+        R(g, RC.metalL, cx + (f === 1 ? -1 : f === 2 ? 1 : 0), 42, 1, 1);
+      }
     }
-    hatFront(g);
-  }, '#2b1a0e');
+
+    // うで（まえから・うしろから は りょうがわ、よこからは てまえの 1ぽん）
+    const arm = (x, y, big) => {
+      if (big) {
+        E(g, RC.metalD, x + 2, y, 3, 3);
+        E(g, RC.metal, x + 2, y - 1, 2, 2);
+        R(g, RC.metal, x, y + 2, 5, 8);
+        R(g, RC.metalL, x, y + 2, 1, 8);
+        for (let k = 0; k < 8; k += 3) R(g, RC.hazard, x + 1, y + 3 + k, 3, 1);
+        R(g, RC.metalD, x - 1, y + 10, 2, 3);
+        R(g, RC.metalD, x + 4, y + 10, 2, 3);
+      } else {
+        R(g, RC.metalD, x + 1, y, 3, 9);
+        R(g, RC.metal, x + 1, y, 1, 9);
+        R(g, RC.rust, x + 2, y + 4, 1, 1);
+        R(g, RC.metalD, x, y + 9, 1, 2);
+        R(g, RC.metalD, x + 4, y + 9, 1, 2);
+      }
+    };
+    const big = parts.arm >= 1;
+    if (!side) {
+      arm(big ? 1 : 3, 26 + ru, big);
+      arm(big ? 26 : 25, 26 + lu, big);
+    }
+
+    // からだ
+    const bx = side ? 10 : 8, bw = side ? 13 : 17;
+    R(g, RC.bodyD, bx, 24, bw, 15);
+    R(g, RC.body, bx + 1, 24, bw - 2, 13);
+    R(g, RC.bodyL, bx + 1, 24, 2, 13);
+    R(g, RC.bodyD, bx, 36, bw, 1);
+    R(g, RC.rust, bx + bw - 4, 33, 2, 2);
+    R(g, RC.rustL, bx + bw - 4, 33, 1, 1);
+    if (dir === 'down') {
+      R(g, RC.panel, 12, 27, 9, 7);
+      R(g, on ? RC.green : RC.greenOff, 13, 28, 2, 2);
+      for (let k = 0; k < 3; k++) R(g, on ? RC.eyeOn : RC.eyeOff, 16 + k * 2 - 1, 31, 1, 2);
+      R(g, on ? RC.pink : RC.pinkOff, 13, 32, 7, 1);
+    } else if (dir === 'up') {
+      // せなかの でんち
+      R(g, RC.metalD, 11, 26, 11, 10);
+      R(g, RC.panel, 12, 27, 9, 8);
+      for (let k = 0; k < 3; k++) R(g, on ? RC.green : RC.greenOff, 13, 33 - k * 2, 7, 1);
+      R(g, RC.metal, 15, 25, 3, 1);
+    } else {
+      R(g, RC.panel, 18, 28, 4, 5);
+      R(g, on ? RC.green : RC.greenOff, 19, 29, 2, 1);
+    }
+
+    // くび と あたま
+    R(g, RC.metalD, 14, 21 + slump, 5, 4);
+    const hy = 8 + slump;
+    const hx = side ? 9 : 7, hw = side ? 16 : 19;
+    R(g, RC.bodyD, hx, hy, hw, 14);
+    R(g, RC.body, hx + 1, hy, hw - 2, 12);
+    R(g, RC.bodyL, hx + 1, hy, hw - 2, 2);
+    R(g, RC.rust, hx + 2, hy + 9, 2, 1);
+    if (dir === 'down') {
+      R(g, RC.visor, 9, hy + 4, 15, 6);
+      R(g, eye, 11, hy + 5, 4, on ? 3 : 1);
+      R(g, eye, 18, hy + 5, 4, on ? 3 : 1);
+      if (on) {
+        R(g, '#ffffff', 11, hy + 5, 1, 1);
+        R(g, '#ffffff', 18, hy + 5, 1, 1);
+      }
+      for (let x = 13; x < 20; x += 2) R(g, RC.metalD, x, hy + 11, 1, 2);
+      R(g, RC.metal, 5, hy + 5, 2, 4);
+      R(g, RC.metal, 26, hy + 5, 2, 4);
+    } else if (dir === 'up') {
+      for (let y = hy + 4; y < hy + 11; y += 2) R(g, RC.bodyD, 10, y, 13, 1);
+      R(g, RC.metal, 5, hy + 5, 2, 4);
+      R(g, RC.metal, 26, hy + 5, 2, 4);
+    } else {
+      R(g, RC.visor, 17, hy + 4, 8, 6);
+      R(g, eye, 20, hy + 5, 3, on ? 3 : 1);
+      if (on) R(g, '#ffffff', 20, hy + 5, 1, 1);
+      R(g, RC.metal, 11, hy + 5, 3, 4);
+      R(g, RC.metalL, 12, hy + 6, 1, 1);
+    }
+
+    // アンテナ（センサー）
+    const ax = side ? 14 : 16;
+    if (parts.sensor >= 1) {
+      R(g, RC.metal, ax, hy - 6, 1, 6);
+      R(g, RC.metalD, ax + 1, hy - 6, 1, 6);
+      E(g, ball, ax, hy - 7, 2, 2);
+      if (on) R(g, '#ffd0f4', ax - 1, hy - 8, 1, 1);
+    } else {
+      R(g, RC.metalD, ax, hy - 3, 1, 3);
+      R(g, RC.metalD, ax + 1, hy - 4, 1, 1);
+      R(g, RC.rust, ax + 2, hy - 5, 1, 1);
+    }
+
+    // よこむきの うで（てまえ）
+    if (side) {
+      const sw = f === 1 ? 2 : f === 2 ? -2 : 0;
+      arm(13 + sw, 26, big);
+    }
+  }, '#11141c');
+}
+
+// パーツの くみあわせ ごとに つくって おく
+function robotSpr(dir, f, parts, on) {
+  const key = `r_${dir}_${f}_${parts.legs}${parts.arm}${parts.sensor}_${on ? 1 : 0}`;
+  if (!SP[key]) {
+    SP[key] = dir === 'left' ? flipX(robotSpr('right', f, parts, on))
+      : robotSprite(dir === 'right' ? 'side' : dir, f, parts, on);
+  }
+  return SP[key];
+}
+
+// パーツの アイコン（lv 0 は うすく だす）
+function partIcon(kind) {
+  return oicon((g) => {
+    if (kind === 'legs') {
+      R(g, RC.tread, 3, 12, 24, 12);
+      R(g, RC.treadL, 3, 12, 24, 1);
+      for (let x = 5; x < 26; x += 3) R(g, RC.treadL, x, 14, 1, 9);
+      E(g, RC.metal, 8, 18, 3, 3);
+      E(g, RC.metal, 22, 18, 3, 3);
+      E(g, RC.metalD, 15, 18, 3, 3);
+    } else if (kind === 'arm') {
+      E(g, RC.metalD, 8, 7, 5, 5);
+      E(g, RC.metal, 7, 6, 3, 3);
+      for (let i = 0; i < 12; i++) R(g, RC.metal, 9 + i, 9 + i, 5, 3);
+      for (let i = 0; i < 12; i += 4) R(g, RC.hazard, 10 + i, 10 + i, 3, 1);
+      R(g, RC.metalD, 20, 22, 3, 6);
+      R(g, RC.metalD, 25, 19, 3, 6);
+    } else {
+      R(g, RC.metal, 14, 8, 2, 16);
+      R(g, RC.metalD, 16, 8, 1, 16);
+      E(g, RC.pink, 15, 6, 4, 4);
+      R(g, '#ffd0f4', 13, 4, 2, 1);
+      R(g, RC.metalD, 9, 24, 12, 4);
+      for (let k = 0; k < 3; k++) {
+        R(g, RC.eyeOn, 21 + k * 2, 5 + k * 2, 1, 4 - k);
+        R(g, RC.eyeOn, 8 - k * 2, 5 + k * 2, 1, 4 - k);
+      }
+    }
+  }, '#11141c');
 }
 
 function buildPlayer() {
-  for (let f = 0; f < 3; f++) {
-    SP[`p_down_${f}`] = playerSprite('down', f);
-    SP[`p_up_${f}`] = playerSprite('up', f);
-    SP[`p_right_${f}`] = playerSprite('side', f);
-    SP[`p_left_${f}`] = flipX(SP[`p_right_${f}`]);
-  }
+  for (const k of Object.keys(PARTS)) ICON[`part_${k}`] = partIcon(k);
 }
 
 // ---------- はたけ ----------

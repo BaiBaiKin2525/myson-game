@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#5a3a20">
-  <title>おじいちゃんの いえ</title>
+  <meta name="theme-color" content="#0b0620">
+  <title>ネオン ロボファーム</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
 
   <div id="play" class="hidden">
     <div id="hud">
-      <div id="stamina" class="chip">⚡ <div class="bar"><i id="stBar"></i></div><span id="stNum">0</span></div>
+      <div id="stamina" class="chip">🔋 <div class="bar"><i id="stBar"></i></div><span id="stNum">0</span></div>
       <div class="chip"><img class="ic s" id="coinIc" alt=""> <span id="moneyNum">0</span>G</div>
       <div class="chip">📅 <span id="dayNum">1</span>にちめ</div>
       <div id="tidyChip" class="chip">🧹 かたづけ <span id="tidyNum">0/10</span></div>
@@ -59,16 +59,23 @@
   </div>
 
   <div id="fade"><div id="fadeText"></div></div>
+  <div id="flash"></div>
+
+  <div id="offNote" class="hidden">
+    <div class="bat">🔋 0</div>
+    <p>ロボは とまった まま うごかない…<br>さんすうアプリで「じつりょくテスト」を やってみよう！</p>
+    <a id="offMath" class="tomath">🧮 さんすうアプリへ</a>
+  </div>
 
   <div id="title" class="hidden">
     <div class="logo">
-      <div class="sub">ぼくの わたしの</div>
-      <h1>おじいちゃんの いえ</h1>
-      <div class="sub2">〜 つりと はたけの ものがたり 〜</div>
+      <div class="sub">NEON ROBO FARM // 2099</div>
+      <h1><span class="n1">ネオン</span> <span class="n2">ロボファーム</span></h1>
+      <div class="sub2">〜 かみなりで めざめた ロボと さびれた むら 〜</div>
     </div>
     <p class="who">だれが あそぶ？</p>
     <div id="profiles"></div>
-    <p class="note">⚡ げんきは さんすうアプリの「じつりょくテスト」で ふえるよ</p>
+    <p class="note">🔋 でんちは さんすうアプリの「じつりょくテスト」で かみなりが おちて じゅうでん されるよ</p>
     <a id="toMath" class="tomath">🧮 さんすうアプリに もどる</a>
   </div>
 
