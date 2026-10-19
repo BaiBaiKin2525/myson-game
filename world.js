@@ -1,5 +1,5 @@
 'use strict';
-// マップ：はかせの いえ（なか）と そと（はたけ・いけ・じどう はんばいき）。だれも いなくなった さびれた むら
+// マップ：くずれかけた けんきゅうじょ（なか）と そと（はたけ・いけ・じどう はんばいき）。だれも いなくなった さびれた むら
 
 const TL = { GRASS: 0, PATH: 1, WATER: 2, SAND: 3, FLOOR: 4, WALL: 5, FACE: 6 };
 const FARM = { x0: 4, y0: 12, x1: 13, y1: 21 }; // たがやせる ところ
@@ -69,11 +69,11 @@ function objAt(m, x, y) {
 const walkable = (m, x, y) => x >= 0 && y >= 0 && x < m.w && y < m.h && !m.solid[y * m.w + x];
 const tileAt = (m, x, y) => (x < 0 || y < 0 || x >= m.w || y >= m.h ? -1 : m.tiles[y * m.w + x]);
 
-// ---------- いえの なか（14×10） ----------
+// ---------- けんきゅうじょの なか（14×10） ----------
 
 function buildHouse(save) {
   const m = newMap('house', 14, 10);
-  m.name = 'はかせの いえ';
+  m.name = 'はかせの けんきゅうじょ';
   for (let y = 0; y < m.h; y++) {
     for (let x = 0; x < m.w; x++) {
       let t = TL.FLOOR;
@@ -97,7 +97,7 @@ function buildHouse(save) {
 
   addObj(m, { t: 'bed', spr: 'bed', x: 1, y: 2, w: 2, h: 2, solid: true, act: 'bed' });
   addObj(m, { t: 'closet', spr: 'closet', x: 10, y: 2, w: 2, h: 1, solid: true, act: 'closet' });
-  // ロボが とまっていた じゅうでんき（やねの アンテナと つながっている）
+  // ロボが とまっていた じゅうでん そうち（ここに かみなりが おちて めを さます）
   addObj(m, { t: 'charger', spr: 'charger', x: 4, y: 2, w: 2, h: 1, solid: true, act: 'charger' });
   addObj(m, { t: 'table', spr: 'table', x: 7, y: 4, w: 2, h: 1, solid: true, act: 'table' });
 
@@ -156,7 +156,7 @@ function buildOutside(save) {
     }
   }
 
-  // いえ（ドアの マスだけ とおれる）
+  // けんきゅうじょ（ドアの マスだけ とおれる）
   addObj(m, { t: 'house', spr: 'house', x: 14, y: 3, w: 6, h: 5, solid: true });
   const di = 7 * W + 16;
   m.og[di] = null;

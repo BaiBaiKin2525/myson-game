@@ -1,7 +1,7 @@
 'use strict';
 // ゲームの ほんたい：うごく・かたづける・つる・たがやす・ねる・かう・うる
 // おはなし：だれも いなくなった さびれた むらに、ロボが ひとり のこされて とまっていた。
-// さんすうアプリで さいしょの じつりょくテストを やると、かみなりが おちて じゅうでんきに でんきが ながれ、ロボが めを さます
+// さんすうアプリで さいしょの じつりょくテストを やると、じゅうでん そうちに かみなりが おちて システムが ふっきゅうし、ロボが でんちぎれ から めを さます
 
 const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -81,8 +81,9 @@ function startGame(p) {
     // まだ とまっている：おはなしの はじまり。じつりょくテストの かみなりを まつ
     UI.say([
       'ここは だれも いなく なった、さびれた むら。',
-      'はかせの いえの すみで、1だいの ロボが とまって いた。',
-      'じゅうでんきは こわれて いて、でんち🔋は からっぽ…',
+      'むらの はずれに、くずれかけた けんきゅうじょが ある。',
+      'その おくで、でんち🔋が きれた ロボが 1だい とまって いた。',
+      'じゅうでん そうちは こわれて いて、うごかない…',
       '（さんすうアプリで「じつりょくテスト」を やると… なにかが おきるかも！）',
     ], () => UI.offNote(!G.save.flags.awake && !G.waking));
   }
@@ -117,11 +118,12 @@ function wakeUp(added) {
     Sfx.play('boot');
     UI.say([
       'ピカッ！！ ゴロゴロ…！',
-      'やねの アンテナに かみなりが おちた！\nじゅうでんきに でんきが ながれこむ…',
-      `ピピッ… でんち🔋 じゅうでん ${unlimitedStamina() ? '∞' : added}。\nロボ、きどう します。`,
-      'ここは… はかせの いえ？\nはかせは… いない みたい。',
-      'いえの なかは がらくただらけ。\nまずは かたづけから はじめよう！',
-      'がらくたの まえで Ⓐボタン を おすと もちあげられるよ。\nたんす まで はこんで、もういちど Ⓐ で しまおう。',
+      'くずれた やねから、じゅうでん そうちに かみなりが おちた！\nバチバチッ… でんきが ながれこむ…',
+      'ピピッ… システム チェック… ふっきゅう しました。',
+      `でんち🔋 じゅうでん ${unlimitedStamina() ? '∞' : added}。\nでんちぎれ から ふっき します… ロボ、きどう！`,
+      'ここは… はかせの けんきゅうじょ？\nはかせは… いない みたい。',
+      'けんきゅうじょは くずれかけて、がらくただらけ。\nまずは かたづけから はじめよう！',
+      'がらくたの まえで Ⓐボタン を おすと もちあげられるよ。\nロッカー まで はこんで、もういちど Ⓐ で しまおう。',
       'うごいたり ものを もつと でんち🔋が へるよ。\nさんすうアプリで「じつりょくテスト」を やると、また かみなりで じゅうでん できるよ！',
     ], () => {
       s.flags.intro = true;
@@ -406,11 +408,11 @@ function tryStep(d) {
 
 function canUseDoor(door) {
   if (door.to === 'out' && !G.save.tools.rod) {
-    UI.say('そとに でる まえに、いえの なかを かたづけよう。\nなにか いい ものが みつかるかも！');
+    UI.say('そとに でる まえに、けんきゅうじょの なかを かたづけよう。\nなにか いい ものが みつかるかも！');
     return false;
   }
   if (G.save.tidy.carry) {
-    UI.say('もっている ものを たんすに しまってから でかけよう。');
+    UI.say('もっている ものを ロッカーに しまってから でかけよう。');
     return false;
   }
   return true;
@@ -441,7 +443,7 @@ function goThrough(door) {
         UI.say([
           'そとに でた！ むらは しーんと して いる…',
           'みぎの ほうに いけが ある。\nみずの まえで つりざおを えらんで Ⓐ！',
-          'つった さかなは、いえの よこの「しゅっかばこ」で おかねに なるよ。',
+          'つった さかなは、けんきゅうじょの よこの「しゅっかばこ」で おかねに なるよ。',
           'みちの さきで、なにかが ネオンの ひかりで ひかって いる…',
         ]);
       }
@@ -464,7 +466,7 @@ function doAction() {
     if (o && o.act === 'closet') storeClutter();
     else {
       Sfx.play('err');
-      UI.toast('たんすの まえで Ⓐ を おして しまおう');
+      UI.toast('ロッカーの まえで Ⓐ を おして しまおう');
     }
     return;
   }
@@ -488,31 +490,31 @@ const ACT = {
     G.save.tidy.carry = o.cid;
     Sfx.play('pick');
     const c = CLUTTER.find((x) => x.id === o.cid);
-    UI.toast(`${c.name}を もちあげた！ たんすへ はこぼう`);
+    UI.toast(`${c.name}を もちあげた！ ロッカーへ はこぼう`);
     persist();
   },
   closet() {
     const n = G.save.tidy.stored.length;
     UI.say(n >= CLUTTER.length
-      ? 'たんすの なかは きれいに かたづいて いる。'
-      : `たんす。がらくたを ここに しまおう。（${n}/${CLUTTER.length}）`);
+      ? 'ロッカーの なかは きれいに かたづいて いる。'
+      : `ロッカー。がらくたを ここに しまおう。（${n}/${CLUTTER.length}）`);
   },
   bed() {
-    UI.ask('はかせの ベッド。ロボは ここで スリープ モードに なる。\nスリープ して あしたに する？\n（みずを あげた やさいが そだつよ。でんち🔋は ふえないよ）', ['スリープ', 'まだ'], (k) => {
+    UI.ask('スリープ ポッド。ロボは ここで スリープ モードに なる。\nスリープ して あしたに する？\n（みずを あげた やさいが そだつよ。でんち🔋は ふえないよ）', ['スリープ', 'まだ'], (k) => {
       if (k === 0) sleep();
     });
   },
   charger() {
     UI.say([
-      'じゅうでんき。こわれて いて、ふだんは うごかない。',
-      'でも やねの アンテナに かみなりが おちると、でんきが ながれこむ みたい。\n（さんすうアプリの「じつりょくテスト」で かみなりが おちるよ）',
+      'じゅうでん そうち。こわれて いて、ふだんは うごかない。',
+      'でも かみなりが おちると、でんきが ながれこむ みたい。\n（さんすうアプリの「じつりょくテスト」で かみなりが おちるよ）',
     ]);
   },
   table() {
     UI.say([
-      'テーブルの うえに しゃしんが ある。',
+      'つくえの うえに しゃしんが ある。モニターは こわれて ちらちら して いる…',
       'はかせと、ぴかぴかだった ころの ロボが うつって いる…',
-      G.save.flags.letter ? 'はかせ、むらと はたけは まかせて！' : 'はかせの いえを きれいに しよう！',
+      G.save.flags.letter ? 'はかせ、むらと はたけは まかせて！' : 'はかせの けんきゅうじょを きれいに しよう！',
     ]);
   },
   bin() { openSell(); },
@@ -578,7 +580,7 @@ function useItem(tx, ty, o) {
   if (sel === 'net') return UI.say('ちいさな むしあみ。\nむしとりは もうすこし あとで できるように なるよ！');
   if (G.map.id !== 'out') {
     Sfx.play('err');
-    UI.toast('いえの なかでは つかえないよ');
+    UI.toast('けんきゅうじょの なかでは つかえないよ');
     return;
   }
   if (sel === 'hoe') return useHoe(tx, ty, o);
@@ -922,7 +924,7 @@ function useVend() {
   const lines = [
     'ピッ… ピピッ。ネオンが ちかちか ひかった。',
     'じどう はんばいきが まだ うごいて いる！\nおかねを いれると、たねや どうぐが かえる みたい。',
-    'つった さかなや やさいは、いえの よこの「しゅっかばこ」に いれると おかねに なるよ。',
+    'つった さかなや やさいは、けんきゅうじょの よこの「しゅっかばこ」に いれると おかねに なるよ。',
   ];
   if (!s.tools.can) lines.push('はたけを やるなら じょうろ（150G）が いるね。\nまずは つりで おかねを ためよう。');
   UI.say(lines, openShop);
@@ -1135,7 +1137,7 @@ function openMenu() {
       add('⚡ かみなりで でんちを 50 とどける（じつりょくテストの かわり）', () => { grantGameStamina(G.pid, 50, 'テスト'); UI.closePanel(); checkGrants(); });
       add('🪙 +500G', () => { s.money += 500; UI.hud(); persist(); UI.rebuild(); });
       add(G.infinite ? '🔋 でんち むげん：オン' : '🔋 でんち むげん：オフ', () => { G.infinite = !G.infinite; UI.hud(); UI.rebuild(); });
-      add('🧹 いえを ぜんぶ かたづける', () => {
+      add('🧹 けんきゅうじょを ぜんぶ かたづける', () => {
         while (s.tidy.stored.length < CLUTTER.length) {
           const c = CLUTTER.find((x) => !s.tidy.stored.includes(x.id));
           s.tidy.stored.push(c.id);
@@ -1256,7 +1258,7 @@ function render() {
   }
 
   // かげ
-  g.fillStyle = m.id === 'house' ? 'rgba(40,20,8,.22)' : 'rgba(20,40,10,.26)';
+  g.fillStyle = m.id === 'house' ? 'rgba(4,6,18,.32)' : 'rgba(20,40,10,.26)';
   for (const o of m.objs) {
     const sh2 = SHADOW[o.t];
     if (!sh2 || o.flat || !inView(o, 2)) continue;
@@ -1299,11 +1301,11 @@ function render() {
     g.fillStyle = 'rgba(8,6,24,.55)';
     g.fillRect(0, 0, G.cw, G.ch);
   }
-  // かたづけるほど いえが あかるく なる
+  // かたづけるほど けんきゅうじょが あかるく なる
   if (m.id === 'house') {
     const n = G.save.tidy.stored.length;
     if (n < CLUTTER.length) {
-      g.fillStyle = `rgba(90,75,55,${0.28 * (1 - n / CLUTTER.length)})`;
+      g.fillStyle = `rgba(10,12,30,${0.32 * (1 - n / CLUTTER.length)})`;
       g.fillRect(0, 0, G.cw, G.ch);
     }
   }
@@ -1383,18 +1385,16 @@ function drawFishing(g, ppx, ppy) {
   }
 }
 
-// かみなり：がめんの うえ から ロボへ ギザギザに おちる（まいかい すこし かたちが かわる）
-function drawBolt(g, x, y, top) {
-  const b = G.bolt;
-  if (b.t > 0.55 || (b.t > 0.2 && b.t < 0.3)) return;
-  const r = RNG(Math.floor(G.time * 30));
+// ギザギザの でんきの せん（まいかい すこし かたちが かわる）
+function drawZap(g, x0, y0, x1, y1, n, jit, wide) {
+  const r = RNG(Math.floor(G.time * 30) + n);
   const pts = [];
-  const n = 9;
   for (let i = 0; i <= n; i++) {
     const k = i / n;
-    pts.push([x + (i === n ? 0 : (r() - 0.5) * 26), top + (y - top) * k]);
+    const j = i === 0 || i === n ? 0 : (r() - 0.5) * jit;
+    pts.push([x0 + (x1 - x0) * k + j, y0 + (y1 - y0) * k + j * 0.4]);
   }
-  for (const [w, col] of [[7, 'rgba(255,79,216,.45)'], [4, 'rgba(95,246,255,.85)'], [2, '#ffffff']]) {
+  for (const [w, col] of [[wide + 3, 'rgba(255,79,216,.45)'], [wide, 'rgba(95,246,255,.85)'], [Math.max(1, wide - 2), '#ffffff']]) {
     g.strokeStyle = col;
     g.lineWidth = w;
     g.lineJoin = 'round';
@@ -1402,11 +1402,32 @@ function drawBolt(g, x, y, top) {
     pts.forEach(([px, py], i) => (i ? g.lineTo(px, py) : g.moveTo(px, py)));
     g.stroke();
   }
-  g.fillStyle = 'rgba(255,255,255,.7)';
+}
+
+function sparks(g, x, y) {
   for (let i = 0; i < 8; i++) {
     const a = i * 0.8 + G.time * 9;
-    R(g, i % 2 ? '#5ff6ff' : '#ffffff', Math.round(x + Math.cos(a) * 12), Math.round(y + 20 + Math.sin(a) * 5), 2, 2);
+    R(g, i % 2 ? '#5ff6ff' : '#ffffff', Math.round(x + Math.cos(a) * 12), Math.round(y + Math.sin(a) * 5), 2, 2);
   }
+}
+
+// かみなり：がめんの うえから おちる。めざめる ときは じゅうでん そうちに おちて、そこから ロボへ でんきが ながれる
+function drawBolt(g, px, py, top) {
+  const b = G.bolt;
+  if (b.t > 0.55 || (b.t > 0.2 && b.t < 0.3)) return;
+  const ch = b.big && G.map.id === 'house' ? G.map.objs.find((o) => o.t === 'charger') : null;
+  if (ch) {
+    const cx = (ch.x + ch.w / 2) * T, cy2 = ch.y * T + 2;
+    drawZap(g, cx + 6, top, cx, cy2, 9, 26, 4);
+    sparks(g, cx, cy2 + 18);
+    if (b.t > 0.1) {
+      drawZap(g, cx, cy2 + 24, px, py + 14, 5, 10, 2);
+      sparks(g, px, py + 20);
+    }
+    return;
+  }
+  drawZap(g, px, top, px, py, 9, 26, 4);
+  sparks(g, px, py + 20);
 }
 
 function drawCursor(g) {
