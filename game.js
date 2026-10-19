@@ -20,6 +20,8 @@ const G = {
 // ---------- はじめる ----------
 
 window.addEventListener('load', () => {
+  // いつも さいしんを よむ ための サービスワーカー（sw.js）
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
   buildSprites();
   G.canvas = $('view');
   G.ctx = G.canvas.getContext('2d');
