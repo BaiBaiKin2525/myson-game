@@ -533,3 +533,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .prof .pn { font-size: 22px; font-weight: 900; }
 .prof .ps { font-size: 15px; color: #6b5034; font-weight: 700; }
 .note { color: #fff; font-weight: 800; text-shadow: 0 2px 0 var(--wood-d); }
+.tomath {
+  margin-top: 6px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 3px solid var(--wood-d);
+  background: var(--paper);
+  color: var(--wood-d);
+  font-weight: 900;
+  font-size: 18px;
+  text-decoration: none;
+  box-shadow: 0 4px 0 var(--wood-d);
+}

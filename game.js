@@ -40,6 +40,7 @@ window.addEventListener('load', () => {
 function showTitle() {
   $('title').classList.remove('hidden');
   $('play').classList.add('hidden');
+  $('toMath').href = CFG.mathUrl;
   const box = $('profiles');
   box.innerHTML = '';
   const cur = currentProfileId();
@@ -1041,6 +1042,10 @@ function openMenu() {
     box.appendChild(el('p', 'help', '⚡ げんきは、さんすうアプリの「じつりょくテスト」の てんすう ぶん ふえるよ。<br>うごいたり、どうぐを つかうと へるよ。ねても もどらないよ。'));
     add(Sfx.mute ? '🔇 おと：なし' : '🔊 おと：あり', () => { Sfx.mute = !Sfx.mute; UI.rebuild(); });
     add('👪 こどもを かえる', () => backToTitle());
+    add('🧮 さんすうアプリに もどる', () => {
+      persist();
+      location.href = CFG.mathUrl;
+    });
     if (G.dev) {
       box.appendChild(el('p', 'help', 'おとな（テスト）メニュー'));
       add('⚡ げんきを 50 とどける（じつりょくテストの かわり）', () => { grantGameStamina(G.pid, 50, 'テスト'); UI.closePanel(); checkGrants(); });

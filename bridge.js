@@ -46,6 +46,7 @@ function loadProfiles() {
   return [
     { id: 'p1', name: 'こども 1', icon: '🦊' },
     { id: 'p2', name: 'こども 2', icon: '🐰' },
+    { id: 'p3', name: 'こども 3', icon: '🐻' },   // さんすうアプリと おなじ 3にん
   ];
 }
 
