@@ -148,7 +148,10 @@ function buildOutside(save) {
       if (!ring) continue;
       m.tsolid[y * W + x] = 1;
       refreshCell(m, y * W + x);
-      if ((x + y) % 2 === 0) addObj(m, { t: 'tree', spr: (x * 7 + y * 3) % 5 === 0 ? 'pine' : 'tree', x, y });
+      if ((x + y) % 2 === 0) {
+        const k = (x * 7 + y * 3) % 5;
+        addObj(m, { t: 'tree', spr: k === 0 ? 'pine' : k % 2 ? 'tree' : 'tree2', x, y });
+      }
     }
   }
 
@@ -170,8 +173,28 @@ function buildOutside(save) {
     addObj(m, { t: 'fence', spr: 'fence', x, y: FARM.y1 + 1, solid: true });
   }
   for (let y = FARM.y0; y <= FARM.y1; y++) {
-    addObj(m, { t: 'fence', spr: 'fence', x: FARM.x0 - 1, y, solid: true });
-    addObj(m, { t: 'fence', spr: 'fence', x: FARM.x1 + 1, y, solid: true });
+    addObj(m, { t: 'fence', spr: 'fenceV', x: FARM.x0 - 1, y, solid: true });
+    addObj(m, { t: 'fence', spr: 'fenceV', x: FARM.x1 + 1, y, solid: true });
+  }
+
+  // スイレンの は（みずの うえ）と ガマ（すなはま）
+  const lr = RNG(31);
+  const deep = [], shore = [];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const t = tileAt(m, x, y);
+      const around = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => tileAt(m, x + dx, y + dy));
+      if (t === TL.WATER && around.every((a) => a === TL.WATER)) deep.push([x, y]);
+      if (t === TL.SAND && x > 31 && around.includes(TL.WATER)) shore.push([x, y]);
+    }
+  }
+  for (let k = 0; k < 5 && deep.length; k++) {
+    const [x, y] = deep.splice((lr() * deep.length) | 0, 1)[0];
+    addObj(m, { t: 'deco', spr: k === 0 ? 'lotus' : 'lily', x, y, flat: true });
+  }
+  for (let k = 0; k < 5 && shore.length; k++) {
+    const [x, y] = shore.splice((lr() * shore.length) | 0, 1)[0];
+    addObj(m, { t: 'reed', spr: 'reed', x, y });
   }
 
   // はたけは くさと いしで おおわれている（かりとった ところは もう でない）
@@ -205,8 +228,8 @@ function buildOutside(save) {
     const y = 2 + ((tr() * (H - 4)) | 0);
     if (busy(x, y)) continue;
     const kind = tr();
-    if (kind < 0.55) addObj(m, { t: 'tree', spr: kind < 0.15 ? 'pine' : 'tree', x, y, solid: true });
-    else addObj(m, { t: 'bush', spr: 'bush', x, y, solid: true });
+    if (kind < 0.55) addObj(m, { t: 'tree', spr: kind < 0.15 ? 'pine' : kind < 0.35 ? 'tree' : 'tree2', x, y, solid: true });
+    else addObj(m, { t: 'bush', spr: kind < 0.8 ? 'bush' : 'bush2', x, y, solid: true });
     trees++;
   }
   for (let k = 0; k < 60; k++) {

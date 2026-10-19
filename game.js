@@ -61,6 +61,7 @@ function startGame(p) {
   G.profile = p;
   G.save = loadSave(p.id) || newSave();
   G.maps = { house: buildHouse(G.save), out: buildOutside(G.save) };
+  for (const mm of Object.values(G.maps)) bakeGround(mm);
   const pos = G.save.pos;
   const m = G.maps[pos.map] ? pos.map : 'house';
   if (walkable(G.maps[m], pos.x, pos.y)) setMap(m, pos.x, pos.y, pos.dir);
@@ -492,7 +493,7 @@ function addItem(id, n = 1) {
 function addFx(text, color, x, y) {
   const p = G.p;
   const px = x != null ? x : (p.x + 0.5) * T;
-  const py = y != null ? y : p.y * T - 6;
+  const py = y != null ? y : p.y * T - 22;
   G.fx.push({ text, color, x: px, y: py, t: 0 });
 }
 
@@ -999,6 +1000,7 @@ function openMenu() {
         s.tidy.carry = null;
         for (const g of ['rod', 'net', 'hoe', 'letter']) giveMilestone(g);
         G.maps.house = buildHouse(s);
+        bakeGround(G.maps.house);
         if (G.map.id === 'house') G.map = G.maps.house;
         persist();
         UI.closePanel();
@@ -1019,16 +1021,28 @@ function openMenu() {
 
 // ---------- かく ----------
 
+// ものの かげ（よこの はんけい・たての はんけい）
+const SHADOW = {
+  tree: [24, 6], bush: [15, 4], rock: [12, 3], stall: [44, 5], bin: [28, 4], sign: [9, 3],
+  clutter: [12, 3], reed: [6, 2], table: [28, 4], closet: [30, 3], stove: [30, 3], bed: [30, 3],
+};
+
 function resize() {
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   G.canvas.width = Math.round(innerWidth * dpr);
   G.canvas.height = Math.round(innerHeight * dpr);
   G.cw = G.canvas.width;
   G.ch = G.canvas.height;
-  // 1マスが ちょうどの ドット数に なる おおきさ（たて 11マス くらい）
-  G.scale = Math.max(2, Math.floor(G.ch / (T * 11)));
-  while (G.scale > 2 && G.cw / (G.scale * T) < 15) G.scale--;
+  // 1ドットが ちょうど なんピクセルかに なる おおきさ（たて 11マス くらい みえる）
+  G.scale = Math.max(1, Math.floor(G.ch / (T * 11)));
+  while (G.scale > 1 && G.cw / (G.scale * T) < 15) G.scale--;
   G.ctx.imageSmoothingEnabled = false;
+  // ひだりうえから さす ひかり
+  const lg = G.ctx.createLinearGradient(0, 0, G.cw, G.ch);
+  lg.addColorStop(0, 'rgba(255,236,170,.15)');
+  lg.addColorStop(0.5, 'rgba(255,236,170,0)');
+  lg.addColorStop(1, 'rgba(40,20,60,.13)');
+  G.light = lg;
 }
 
 function drawSpr(g, spr, o) {
@@ -1045,6 +1059,13 @@ function drawSpr(g, spr, o) {
   }
 }
 
+function shadowAt(g, cx, by, rx, ry) {
+  for (let y = -ry; y <= ry; y++) {
+    const w = Math.round(rx * 2 * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry + 0.5))));
+    g.fillRect(Math.round(cx - w / 2), Math.round(by + y), w, 1);
+  }
+}
+
 function render() {
   const g = G.ctx;
   g.setTransform(1, 0, 0, 1, 0, 0);
@@ -1057,92 +1078,95 @@ function render() {
   const ppx = (p.x + (p.tx - p.x) * k) * T;
   const ppy = (p.y + (p.ty - p.y) * k) * T;
   const mw = m.w * T, mh = m.h * T;
-  const cx = Math.round(mw <= vw ? -(vw - mw) / 2 : clamp(ppx + 8 - vw / 2, 0, mw - vw));
-  const cy = Math.round(mh <= vh ? -(vh - mh) / 2 : clamp(ppy + 8 - vh / 2, 0, mh - vh));
+  const cx = Math.round(mw <= vw ? -(vw - mw) / 2 : clamp(ppx + T / 2 - vw / 2, 0, mw - vw));
+  const cy = Math.round(mh <= vh ? -(vh - mh) / 2 : clamp(ppy + T / 2 - vh / 2, 0, mh - vh));
   g.setTransform(s, 0, 0, s, -cx * s, -cy * s);
   g.imageSmoothingEnabled = false;
 
+  // じめん（やきこんだ え の みえる ところだけ）
+  const sx = Math.max(0, cx), sy = Math.max(0, cy);
+  const sw = Math.min(mw, cx + vw) - sx, sh = Math.min(mh, cy + vh) - sy;
+  if (sw > 0 && sh > 0) g.drawImage(m.ground, sx, sy, sw, sh, sx, sy, sw, sh);
   const x0 = Math.max(0, Math.floor(cx / T)), y0 = Math.max(0, Math.floor(cy / T));
   const x1 = Math.min(m.w - 1, Math.floor((cx + vw) / T)), y1 = Math.min(m.h - 1, Math.floor((cy + vh) / T));
-  const wf = Math.floor(G.time * 1.5);
-  const isW = (x, y) => tileAt(m, x, y) === TL.WATER || tileAt(m, x, y) === -1;
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      const i = y * m.w + x;
-      const t = m.tiles[i];
-      let spr;
-      if (t === TL.GRASS) spr = SP[`grass${m.v[i]}`];
-      else if (t === TL.PATH) spr = SP.path;
-      else if (t === TL.SAND) spr = SP.sand;
-      else if (t === TL.FLOOR) spr = SP.floor;
-      else if (t === TL.WALL) spr = SP.wall;
-      else if (t === TL.FACE) spr = SP.face;
-      else {
-        const mask = (isW(x, y - 1) ? 0 : 1) | (isW(x + 1, y) ? 0 : 2) | (isW(x, y + 1) ? 0 : 4) | (isW(x - 1, y) ? 0 : 8);
-        spr = waterTile(mask, (wf + x + y * 2) % 2);
-      }
-      g.drawImage(spr, x * T, y * T);
-    }
-  }
+  if (m.id === 'out') drawWaterSparkles(g, m, x0, y0, x1, y1, G.time);
+
   const inView = (o, mg) => o.x + o.w >= x0 - mg && o.x <= x1 + mg && o.y + o.h >= y0 - mg && o.y <= y1 + mg + 3;
   for (const o of m.objs) if (o.flat && inView(o, 1)) drawSpr(g, SP[o.spr], o);
 
-  // はたけ
+  // はたけ（つち）
+  const crops = [];
   if (m.id === 'out') {
     for (const [key, pl] of Object.entries(G.save.plots)) {
       const [x, y] = key.split(',').map(Number);
       if (x < x0 - 1 || x > x1 + 1 || y < y0 - 1 || y > y1 + 1) continue;
       g.drawImage(pl.w ? SP.soilWet : SP.soil, x * T, y * T);
-      if (pl.c) {
-        const st = cropStage(pl.c);
-        g.drawImage(SP[`crop_${pl.c.id}_${st}`], x * T, y * T - (st === 3 ? 2 : 0));
-        if (st === 3 && Math.sin(G.time * 5 + x + y) > 0.3) {
-          R(g, '#fff6a0', x * T + 13, y * T + 1, 1, 3);
-          R(g, '#fff6a0', x * T + 12, y * T + 2, 3, 1);
-        }
-      }
+      if (pl.c) crops.push([x, y, pl.c]);
     }
   }
   if (G.splash) {
     const sp = G.splash;
-    for (let i = 0; i < 6; i++) {
-      const a = i * 1.05 + sp.t * 3;
-      R(g, '#9fd8ff', sp.x * T + 8 + Math.cos(a) * 5, sp.y * T + 6 + Math.sin(a) * 3 + sp.t * 8, 1, 2);
+    for (let i = 0; i < 8; i++) {
+      const a = i * 0.8 + sp.t * 3;
+      R(g, '#9fd8ff', Math.round(sp.x * T + 16 + Math.cos(a) * 10), Math.round(sp.y * T + 10 + Math.sin(a) * 5 + sp.t * 16), 1, 3);
     }
   }
 
-  // たかさの ある もの と しゅじんこうを、したに ある じゅんに
+  // かげ
+  g.fillStyle = m.id === 'house' ? 'rgba(40,20,8,.22)' : 'rgba(20,40,10,.26)';
+  for (const o of m.objs) {
+    const sh2 = SHADOW[o.t];
+    if (!sh2 || o.flat || !inView(o, 2)) continue;
+    shadowAt(g, (o.x + o.w / 2) * T, (o.y + o.h) * T - 3, sh2[0], sh2[1]);
+  }
+  shadowAt(g, ppx + T / 2, ppy + T - 2, 9, 3);
+
+  // たかさの ある もの・やさい・しゅじんこうを、したに ある じゅんに
   const list = [];
   for (const o of m.objs) if (!o.flat && inView(o, 3)) list.push([(o.y + o.h) * T, o]);
+  for (const c of crops) list.push([(c[1] + 1) * T - 1, c]);
   list.push([ppy + T - 0.5, null]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, o] of list) {
-    if (o) drawSpr(g, SP[o.spr], o);
-    else drawPlayer(g, ppx, ppy);
+    if (!o) drawPlayer(g, ppx, ppy);
+    else if (Array.isArray(o)) drawCrop(g, o[0], o[1], o[2]);
+    else drawSpr(g, SP[o.spr], o);
   }
 
   if (G.fishing) drawFishing(g, ppx, ppy);
   if (canControl() && !p.moving && G.save.flags.intro) drawCursor(g);
 
-  g.font = 'bold 7px sans-serif';
+  g.font = 'bold 12px sans-serif';
   g.textAlign = 'center';
   for (const f of G.fx) {
     g.globalAlpha = 1 - f.t;
     g.fillStyle = 'rgba(0,0,0,.6)';
-    g.fillText(f.text, f.x + 0.5, f.y - f.t * 10 + 0.5);
+    g.fillText(f.text, f.x + 1, f.y - f.t * 18 + 1);
     g.fillStyle = f.color;
-    g.fillText(f.text, f.x, f.y - f.t * 10);
+    g.fillText(f.text, f.x, f.y - f.t * 18);
   }
   g.globalAlpha = 1;
 
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.fillStyle = G.light;
+  g.fillRect(0, 0, G.cw, G.ch);
   // かたづけるほど いえが あかるく なる
   if (m.id === 'house') {
     const n = G.save.tidy.stored.length;
     if (n < CLUTTER.length) {
-      g.setTransform(1, 0, 0, 1, 0, 0);
       g.fillStyle = `rgba(90,75,55,${0.28 * (1 - n / CLUTTER.length)})`;
       g.fillRect(0, 0, G.cw, G.ch);
     }
+  }
+}
+
+function drawCrop(g, x, y, c) {
+  const st = cropStage(c);
+  const spr = SP[`crop_${c.id}_${st}`];
+  g.drawImage(spr, x * T + (T - spr.width) / 2, (y + 1) * T - spr.height + 1);
+  if (st === 3 && Math.sin(G.time * 5 + x + y) > 0.3) {
+    R(g, '#fff6a0', x * T + 27, y * T - 4, 1, 5);
+    R(g, '#fff6a0', x * T + 25, y * T - 2, 5, 1);
   }
 }
 
@@ -1150,10 +1174,13 @@ function drawPlayer(g, x, y) {
   const p = G.p;
   const f = p.moving ? (p.t < 0.5 ? 1 : 2) : 0;
   const bob = p.moving && p.t >= 0.25 && p.t < 0.75 ? -1 : 0;
-  g.drawImage(SP[`p_${p.dir}_${f}`], Math.round(x), Math.round(y) - 8 + bob);
+  const spr = SP[`p_${p.dir}_${f}`];
+  const px = Math.round(x + (T - spr.width) / 2), py = Math.round(y + T - spr.height + 2) + bob;
+  g.drawImage(spr, px, py);
   if (G.save.tidy.carry) {
     const c = CLUTTER.find((q) => q.id === G.save.tidy.carry);
-    g.drawImage(SP[`c_${c.kind}`], Math.round(x), Math.round(y) - 20 + bob);
+    const cs = SP[`c_${c.kind}`];
+    g.drawImage(cs, Math.round(x + (T - cs.width) / 2), py - cs.height + 10);
   }
 }
 
@@ -1161,35 +1188,40 @@ function drawFishing(g, ppx, ppy) {
   const f = G.fishing;
   const p = G.p;
   const [dx, dy] = DIRV[p.dir];
-  const hx = ppx + 8 + dx * 5, hy = ppy + 4 + (dy > 0 ? 2 : 0);
-  const tipX = hx + dx * 9, tipY = hy - 8 + dy * 4;
-  let bx = f.tx * T + 8, by = f.ty * T + 9;
-  if (f.state === 'bite') by += Math.sin(G.time * 40) > 0 ? 2 : 1;
-  if (f.state === 'reel') { bx += Math.sin(G.time * 13) * 2; by += 1; }
-  g.strokeStyle = '#7a5230';
-  g.lineWidth = 1.2;
+  const hx = ppx + 16 + dx * 10, hy = ppy + 14 + (dy > 0 ? 4 : 0);
+  const tipX = hx + dx * 18, tipY = hy - 18 + dy * 8;
+  let bx = f.tx * T + 16, by = f.ty * T + 18;
+  if (f.state === 'bite') by += Math.sin(G.time * 40) > 0 ? 3 : 1;
+  if (f.state === 'reel') { bx += Math.round(Math.sin(G.time * 13) * 3); by += 2; }
+  g.strokeStyle = '#4a2e1a';
+  g.lineWidth = 3;
+  g.lineCap = 'round';
   g.beginPath();
   g.moveTo(hx, hy);
   g.lineTo(tipX, tipY);
   g.stroke();
-  g.strokeStyle = 'rgba(255,255,255,.75)';
-  g.lineWidth = 0.4;
+  g.strokeStyle = '#a8804e';
+  g.lineWidth = 1.5;
+  g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.8)';
+  g.lineWidth = 0.75;
   g.beginPath();
   g.moveTo(tipX, tipY);
-  g.quadraticCurveTo((tipX + bx) / 2, Math.max(tipY, by) + 4, bx, by);
+  g.quadraticCurveTo((tipX + bx) / 2, Math.max(tipY, by) + 8, bx, by - 3);
   g.stroke();
-  const r = ((G.time * 5) % 5) + 1;
-  g.strokeStyle = `rgba(255,255,255,${0.6 - r / 10})`;
-  g.lineWidth = 0.5;
+  const r = ((G.time * 6) % 8) + 2;
+  g.strokeStyle = `rgba(220,245,255,${0.7 - r / 14})`;
+  g.lineWidth = 1;
   g.beginPath();
-  g.ellipse(bx, by + 2, r * (f.state === 'wait' ? 1 : 1.6), r * 0.5, 0, 0, Math.PI * 2);
+  g.ellipse(bx, by + 3, r * (f.state === 'wait' ? 1 : 1.6), r * 0.45, 0, 0, Math.PI * 2);
   g.stroke();
-  g.drawImage(SP.bobber, Math.round(bx - 2), Math.round(by - 3));
+  g.drawImage(SP.bobber, Math.round(bx - 4), Math.round(by - 5));
   if (f.state === 'bite') {
-    const ex = Math.round(ppx + 4), ey = Math.round(ppy - 22);
-    R(g, '#ffffff', ex, ey, 8, 10);
-    R(g, '#e8342e', ex + 3, ey + 1, 2, 5);
-    R(g, '#e8342e', ex + 3, ey + 7, 2, 2);
+    const ex = Math.round(ppx + 9), ey = Math.round(ppy - 42);
+    R(g, '#2b1a0e', ex - 1, ey - 1, 16, 22);
+    R(g, '#ffffff', ex, ey, 14, 20);
+    R(g, '#e8342e', ex + 5, ey + 3, 4, 10);
+    R(g, '#e8342e', ex + 5, ey + 15, 4, 3);
   }
 }
 
@@ -1197,11 +1229,13 @@ function drawCursor(g) {
   const [tx, ty] = frontTile();
   const m = G.map;
   if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) return;
-  const a = 0.45 + 0.3 * Math.sin(G.time * 5);
-  g.fillStyle = `rgba(255,255,255,${a})`;
+  const a = 0.5 + 0.3 * Math.sin(G.time * 5);
   const x = tx * T, y = ty * T;
-  for (const [cx, cy, sx, sy] of [[0, 0, 1, 1], [15, 0, -1, 1], [0, 15, 1, -1], [15, 15, -1, -1]]) {
-    g.fillRect(x + cx + (sx < 0 ? -2 : 0), y + cy, 3, 1);
-    g.fillRect(x + cx, y + cy + (sy < 0 ? -2 : 0), 1, 3);
+  for (const [col, o] of [['rgba(40,20,10,.35)', 1], [`rgba(255,255,255,${a})`, 0]]) {
+    g.fillStyle = col;
+    for (const [cx, cy, sx, sy] of [[0, 0, 1, 1], [31, 0, -1, 1], [0, 31, 1, -1], [31, 31, -1, -1]]) {
+      g.fillRect(x + cx + o + (sx < 0 ? -5 : 0), y + cy + o + (sy < 0 ? -1 : 0), 6, 2);
+      g.fillRect(x + cx + o + (sx < 0 ? -1 : 0), y + cy + o + (sy < 0 ? -5 : 0), 2, 6);
+    }
   }
 }

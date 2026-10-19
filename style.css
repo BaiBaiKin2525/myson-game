@@ -39,8 +39,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 .ic { image-rendering: pixelated; width: 32px; height: 32px; vertical-align: middle; }
-.ic.s { width: 22px; height: 22px; }
-.ic.m { width: 44px; height: 44px; }
+.ic.s { width: 24px; height: 24px; }
+.ic.m { width: 48px; height: 48px; }
 .ic.big { width: 128px; height: 128px; }
 
 /* ---------- HUD ---------- */
@@ -181,7 +181,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: var(--paper);
   padding: 0;
 }
-.slot .ic { width: 42px; height: 42px; }
+.slot .ic { width: 48px; height: 48px; }
 .slot.on { border-color: #ffcf3f; background: #fff1b0; box-shadow: 0 0 0 3px #ffcf3f; }
 .slot b {
   position: absolute;
@@ -220,7 +220,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   #dpad .left, #dpad .right { top: 55px; }
   #btnA { width: 96px; height: 96px; font-size: 38px; }
   .slot { width: 48px; height: 48px; }
-  .slot .ic { width: 34px; height: 34px; }
+  .slot .ic { width: 36px; height: 36px; }
   .chip { font-size: 14px; padding: 4px 9px; }
   #stamina .bar { width: 70px; }
 }
@@ -443,7 +443,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .cell b { position: absolute; right: 8px; top: 6px; font-size: 16px; }
 .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
-.dcard { display: grid; grid-template-columns: 48px 1fr; gap: 2px 8px; padding: 8px; background: #fff; border: 3px solid var(--paper-d); border-radius: 12px; }
+.dcard { display: grid; grid-template-columns: 52px 1fr; gap: 2px 8px; padding: 8px; background: #fff; border: 3px solid var(--paper-d); border-radius: 12px; }
 .dcard .ic { grid-row: span 2; }
 .dcard .nm { font-weight: 900; }
 .dcard .ds { font-size: 13px; color: #6b5034; }
