@@ -590,3 +590,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   text-decoration: none;
   box-shadow: 0 4px 0 var(--wood-d);
 }
+
+/* オイル・そうち */
+#oilChip.low { background: rgba(140, 40, 20, 0.85); animation: blink 1.2s infinite; }
+.big.off { opacity: 0.5; }

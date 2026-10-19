@@ -79,6 +79,10 @@ const Sfx = {
         thunder: () => { this.noise(0.25, 0.45); this.tone(90, 1.2, 'sawtooth', 0.12, 0.05, 40); this.noise(0.9, 0.18, 0.2); },
         // ロボが きどう する
         boot: () => [262, 392, 523, 784, 1046].forEach((f, i) => this.tone(f, 0.16, 'square', 0.07, i * 0.1)),
+        squeak: () => { this.tone(1900, 0.05, 'sawtooth', 0.04, 0, 1400); this.tone(1500, 0.06, 'sawtooth', 0.03, 0.06, 1900); },
+        oil: () => [440, 554, 659, 880].forEach((f, i) => this.tone(f, 0.12, 'sine', 0.14, i * 0.07)),
+        synth: () => { this.tone(220, 0.35, 'sawtooth', 0.06, 0, 880); this.noise(0.15, 0.08, 0.3); },
+        press: () => { this.noise(0.1, 0.15); this.tone(160, 0.2, 'square', 0.08, 0.1, 120); },
         beep: () => { this.tone(1320, 0.06, 'square', 0.06); this.tone(1760, 0.08, 'square', 0.06, 0.08); },
       };
       if (S[name]) S[name]();
@@ -215,6 +219,8 @@ UI.hud = () => {
   const ratio = inf ? 1 : Math.min(1, s.stamina / CFG.staminaDay);
   $('stBar').style.width = `${Math.round(ratio * 100)}%`;
   $('stamina').classList.toggle('low', !inf && s.stamina < 10);
+  $('oilNum').textContent = Math.round(s.oil);
+  $('oilChip').classList.toggle('low', s.oil < 25);
   $('moneyNum').textContent = s.money;
   $('dayNum').textContent = s.day;
   const tidyChip = $('tidyChip');

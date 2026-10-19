@@ -17,7 +17,36 @@ const CFG = {
   nibbleGap: [0.45, 1.0], // まえあたりの あいだの びょう
   biteDelay: [0.35, 0.9], // さいごの まえあたり から ほんあたり までの びょう
   missesAllowed: 2,     // リールで まちがえて いい かず
+  // ロボの オイル🛢（0〜100）。うごく たび・どうぐを つかう たび・1にち ごとに へる。すくないと おそく なって ギシギシ いう（とまる ことは ない）
+  oil: { start: 40, perStep: 0.08, perAction: 0.3, perDay: 10 },
+  oilSlow: [[50, 1], [25, 0.8], [1, 0.6], [0, 0.45]], // [この かず いじょう, あるく はやさ]
+  wildRegrow: 3,        // そとの なのはなが また さくまでの ひ
 };
+
+// オイル。しぼりきに さくもつを need こ いれると 1こ できる。oil＝さすと ふえる りょう、trade＝こうえきで うれる ねだん（こうえきは これから）
+const OILS = {
+  o_nanohana: { name: 'なのはな オイル', from: 'c_nanohana', need: 2, oil: 40, trade: 40 },
+  o_goma:     { name: 'ごま オイル',     from: 'c_goma',     need: 2, oil: 60, trade: 80 },
+};
+
+// そざい（ごうせい そうちから でる）。かんづめ そうちを つくったり、しぼりきを なおしたり する
+const MATS = {
+  m_screw: { name: 'ねじ' },
+  m_scrap: { name: 'てつくず' },
+};
+const PRESS_FIX = { m_screw: 1 };                   // こわれた しぼりきを なおす
+const CANNER_RECIPE = { m_scrap: 8, m_screw: 2 };   // かんづめ せいさく そうち（できると さかな・やさいを しゅっか できる）
+
+// ごうせい そうち：いれた ものに よって でる ものが かわる。[でる もの, かくりつ]（のこりは なにも でない）
+// seed は なのはな か ごまの たね。machine は こわれた きかい（ねじが でる）
+const SYNTH = {
+  machine: [['m_screw', 0.3], ['m_scrap', 0.45]],
+  clutter: [['m_scrap', 0.4], ['seed', 0.25]],
+  junk:    [['m_scrap', 0.5], ['seed', 0.1]],
+  food:    [['seed', 0.35], ['m_scrap', 0.1]],
+};
+const SYNTH_SEEDS = ['nanohana', 'goma'];
+const SCREW_PITY = 4;   // こわれた きかいを いれて ねじが でない ことが 4かい つづいたら、つぎは かならず でる
 
 // ロボの パーツ。lv 0 は はじめから ついている ぼろぼろの もの、lv 1 は かたづけで みつかる「ぼろい」パーツ。
 // lv 2（ふつう）は これから たんけんで みつかる ように する。ふつう より うえは そざいを あつめて レベルアップ（よてい）
@@ -52,6 +81,8 @@ const JUNK = {
 
 // やさい。seed＝たねの ねだん、days＝そだつまでに みずを あげる ひ
 const CROPS = {
+  nanohana: { name: 'なのはな', seed: 15, days: 3, sell: 30 },
+  goma:     { name: 'ごま',     seed: 25, days: 5, sell: 55 },
   turnip:  { name: 'かぶ',     seed: 20,  days: 3, sell: 50 },
   carrot:  { name: 'にんじん', seed: 35,  days: 4, sell: 85 },
   tomato:  { name: 'トマト',   seed: 60,  days: 6, sell: 170 },
@@ -67,34 +98,49 @@ const TOOLS = {
 };
 const ROD2_PRICE = 600;
 
-// うれる もの（id → なまえ・ねだん）
+// もちもの（id → なまえ・ねだん・しゅるい）。しゅっか できるのは さかな と やさい だけ（かんづめ そうちが できてから）
 const ITEMS = {};
 for (const [k, f] of Object.entries(FISH)) ITEMS[`f_${k}`] = { name: f.name, sell: f.sell, cat: 'fish' };
-for (const [k, j] of Object.entries(JUNK)) ITEMS[`j_${k}`] = { name: j.name, sell: j.sell, cat: 'junk' };
+for (const [k, j] of Object.entries(JUNK)) ITEMS[`j_${k}`] = { name: j.name, sell: 0, cat: 'junk' };
 for (const [k, c] of Object.entries(CROPS)) ITEMS[`c_${k}`] = { name: c.name, sell: c.sell, cat: 'crop' };
-ITEMS.stone = { name: 'いし', sell: 2, cat: 'misc' };
+for (const [k, o] of Object.entries(OILS)) ITEMS[k] = { name: o.name, sell: 0, cat: 'oil' };
+for (const [k, m] of Object.entries(MATS)) ITEMS[k] = { name: m.name, sell: 0, cat: 'mat' };
+ITEMS.stone = { name: 'いし', sell: 0, cat: 'junk' };
+ITEMS.scrap = { name: 'こわれた きかい', sell: 0, cat: 'machine' };
 
-// くずれかけた けんきゅうじょの がらくた（しまう ばしょは ロッカー）
+// そとに さいている なのはな（さいしょは 2ほん だけ）と、みちに おちている こわれた きかい
+const WILD = [
+  { id: 'w1', x: 11, y: 6 },
+  { id: 'w2', x: 20, y: 7 },
+];
+const SCRAPS = [
+  { id: 's1', x: 13, y: 10 },
+  { id: 's2', x: 19, y: 10 },
+  { id: 's3', x: 26, y: 10 },
+  { id: 's4', x: 28, y: 8 },
+];
+
+// くずれかけた けんきゅうじょの がらくた（ごうせい そうちに いれる）。machine は こわれた きかい（ねじが でる かも）
 const CLUTTER = [
   { id: 'c1',  kind: 'crate',   x: 2,  y: 6, name: 'ほこりまみれの コンテナ' },
   { id: 'c2',  kind: 'cable',   x: 4,  y: 4, name: 'からまった ケーブル' },
   { id: 'c3',  kind: 'beaker',  x: 9,  y: 3, name: 'われた ビーカー' },
-  { id: 'c4',  kind: 'monitor', x: 11, y: 5, name: 'こわれた モニター' },
+  { id: 'c4',  kind: 'monitor', x: 11, y: 5, name: 'こわれた モニター', machine: true },
   { id: 'c5',  kind: 'crate',   x: 3,  y: 8, name: 'ちいさな コンテナ' },
-  { id: 'c6',  kind: 'drum',    x: 10, y: 7, name: 'さびた ドラムかん' },
+  { id: 'c6',  kind: 'machine', x: 10, y: 7, name: 'こわれた そうじ ロボ', machine: true },
   { id: 'c7',  kind: 'coat',    x: 12, y: 8, name: 'はかせの やぶれた はくい' },
-  { id: 'c8',  kind: 'gears',   x: 5,  y: 7, name: 'はぐるまと ネジの やま' },
+  { id: 'c8',  kind: 'gears',   x: 5,  y: 7, name: 'はぐるまの やま', machine: true },
   { id: 'c9',  kind: 'notes',   x: 1,  y: 5, name: 'ふるい けんきゅう ノート' },
   { id: 'c10', kind: 'crate',   x: 8,  y: 8, name: 'おおきな コンテナ' },
 ];
 
-// しまった かずで みつかる もの（part:◯◯ は ロボの ぼろい パーツ）
+// ごうせい そうちに いれた かずで かならず でる だいじな もの（part:◯◯ は ロボの ぼろい パーツ）。ほかの ときは SYNTH の かくりつ
 const MILESTONES = {
-  2: { give: 'part:legs', lines: ['{n}を しまったら…\nした から なにか でてきた！', 'パーツ「ガタガタ キャタピラ」を みつけた！', 'ガシャン！ あしに つけた。\nすこし はやく うごける ように なった！'] },
-  3: { give: 'rod', lines: ['{n}を しまったら…\nおくから なにか でてきた！', '「ぼろい つりざお」を みつけた！', 'はかせの つりざおかな？\nうらの いけで さかなが つれそう！'] },
-  5: { give: 'part:sensor', lines: ['{n}を しまったら…\nキラッと ひかる ものが ある！', 'パーツ「さびた アンテナ」を みつけた！', 'ピピッ… あたまに つけた。\nつりで さかなが くいつくのが わかりやすく なった！'] },
-  6: { give: 'net', lines: ['{n}を しまったら…\nロッカーの すきまに なにか ある！', '「ちいさな むしあみ」を みつけた！', '（むしとりは もうすこし あとで できるように なるよ）'] },
-  8: { give: 'hoe', lines: ['{n}を しまったら…\nかべに なにか たてかけて ある！', '「さびた くわ」を みつけた！', 'これで くさを かったり、はたけを たがやしたり できる！'] },
-  9: { give: 'part:arm', lines: ['{n}を しまったら…\nおもたい はこが ある！', 'パーツ「ギシギシ アーム」を みつけた！', 'ウィーン… うでに つけた。\nはたけの おもい いしも どかせる ように なった！'] },
-  10: { give: 'letter', lines: ['ぜんぶ かたづいた！\nけんきゅうじょに あかりが もどった！', 'あれ？ ロッカーの おくに てがみが ある…', '「ロボへ。\nむらの みんなは まちへ ひっこして しまった。\nうらの いけと みなみの はたけを たのむよ。\nすこしだけど おかねを のこして おくね。\n ― はかせより」', '50G てに いれた！'] },
+  2: { give: 'part:legs', lines: ['{n}を いれたら… ウィーン… ポン！\nなにか でてきた！', 'パーツ「ガタガタ キャタピラ」が できた！', 'ガシャン！ あしに つけた。\nすこし はやく うごける ように なった！'] },
+  3: { give: 'rod', lines: ['{n}を いれたら… ガタガタ… ポン！', '「ぼろい つりざお」が でてきた！', 'はかせの つりざおかな？\nうらの いけで さかなが つれそう！'] },
+  5: { give: 'part:sensor', lines: ['{n}を いれたら… ピカッ！\nキラッと ひかる ものが でてきた！', 'パーツ「さびた アンテナ」が できた！', 'ピピッ… あたまに つけた。\nつりで さかなが くいつくのが わかりやすく なった！'] },
+  6: { give: 'net', lines: ['{n}を いれたら… ポン！', '「ちいさな むしあみ」が でてきた！', '（むしとりは もうすこし あとで できるように なるよ）'] },
+  8: { give: 'hoe', lines: ['{n}を いれたら… ガシャン！', '「さびた くわ」が でてきた！', 'これで くさを かったり、はたけを たがやしたり できる！'] },
+  9: { give: 'part:arm', lines: ['{n}を いれたら… ゴゴゴ… ポン！', 'パーツ「ギシギシ アーム」が できた！', 'ウィーン… うでに つけた。\nはたけの おもい いしも どかせる ように なった！'] },
+  10: { give: 'letter', lines: ['ぜんぶ かたづいた！\nけんきゅうじょに あかりが もどった！', 'ごうせい そうちから、ふるい てがみが でてきた…', '「ロボへ。\nむらの みんなは まちへ ひっこして しまった。\nうらの いけと みなみの はたけを たのむよ。\nオイルを わすれずに さすんだよ。\nすこしだけど おかねを のこして おくね。\n ― はかせより」', '50G てに いれた！'] },
 };

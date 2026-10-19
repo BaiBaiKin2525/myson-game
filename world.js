@@ -96,7 +96,10 @@ function buildHouse(save) {
   }
 
   addObj(m, { t: 'bed', spr: 'bed', x: 1, y: 2, w: 2, h: 2, solid: true, act: 'bed' });
-  addObj(m, { t: 'closet', spr: 'closet', x: 10, y: 2, w: 2, h: 1, solid: true, act: 'closet' });
+  // ごうせい そうち（がらくたや もちものを いれると なにか でる）
+  addObj(m, { t: 'synth', spr: 'synth', x: 10, y: 2, w: 2, h: 1, solid: true, act: 'synth' });
+  // オイル しぼりき（はじめは こわれている。ねじで なおす）
+  addObj(m, { t: 'press', spr: save.flags.pressFixed ? 'pressOk' : 'press', x: 7, y: 2, w: 2, h: 1, solid: true, act: 'press' });
   // ロボが とまっていた じゅうでん そうち（ここに かみなりが おちて めを さます）
   addObj(m, { t: 'charger', spr: 'charger', x: 4, y: 2, w: 2, h: 1, solid: true, act: 'charger' });
   addObj(m, { t: 'table', spr: 'table', x: 7, y: 4, w: 2, h: 1, solid: true, act: 'table' });
@@ -110,6 +113,12 @@ function buildHouse(save) {
 }
 
 // ---------- そと（40×28） ----------
+
+// そとの なのはなが さいている か
+const wildReady = (save, id) => {
+  const d = (save.wild || {})[id];
+  return d == null || save.day - d >= CFG.wildRegrow;
+};
 
 function buildOutside(save) {
   const W = 40, H = 28;
@@ -163,7 +172,13 @@ function buildOutside(save) {
   refreshCell(m, di);
   m.doors.push({ x: 16, y: 7, to: 'house', tx: 6, ty: 8, dir: 'up' });
 
-  addObj(m, { t: 'bin', spr: 'bin', x: 12, y: 7, w: 2, h: 1, solid: true, act: 'bin' });
+  // しゅっかばこ（かんづめ せいさく そうちを つくると かわる）
+  addObj(m, { t: 'bin', spr: save.flags.canner ? 'canner' : 'bin', x: 12, y: 7, w: 2, h: 1, solid: true, act: 'bin' });
+  // なのはな（とっても CFG.wildRegrow にち たつと また さく）と、みちの こわれた きかい
+  for (const w of WILD) addObj(m, { t: 'wild', spr: wildReady(save, w.id) ? 'wild' : 'wildPicked', x: w.x, y: w.y, solid: true, act: 'wild', wid: w.id });
+  for (const sc of SCRAPS) {
+    if (!(save.picked || []).includes(sc.id)) addObj(m, { t: 'scrap', spr: 'c_machine', x: sc.x, y: sc.y, solid: true, act: 'scrap', sid: sc.id });
+  }
   addObj(m, { t: 'vend', spr: 'vend', x: 22, y: 7, w: 2, h: 1, solid: true, act: 'vend' });
   addObj(m, { t: 'sign', spr: 'sign', x: 10, y: 10, solid: true, act: 'signFarm' });
   addObj(m, { t: 'sign', spr: 'sign', x: 29, y: 11, solid: true, act: 'signPond' });

@@ -75,7 +75,11 @@ function newSave() {
     tidy: { stored: [], carry: null },          // しまった がらくた・いま もっている がらくた
     plots: {},                                  // はたけ 'x,y' → { w: みずを あげた, c: { id, d: そだった ひ } }
     cleared: [],                                // かりとった くさ・いし 'x,y'
-    flags: {},                                  // awake：かみなりで めを さました
+    oil: CFG.oil.start,                         // ロボの オイル（0〜100）
+    wild: {},                                   // そとの なのはなを とった ひ（id → day）
+    picked: [],                                 // ひろった みちの こわれた きかい（id）
+    synthMiss: 0,                               // こわれた きかいを いれて ねじが でなかった かず（SCREW_PITY）
+    flags: {},                                  // awake：めを さました・pressFixed：しぼりきを なおした・canner：かんづめ そうちを つくった
     pos: { map: 'house', x: 5, y: 3, dir: 'up' }, // じゅうでんきの まえで とまっている
     totals: { fish: 0, harvest: 0, earned: 0 },
   };

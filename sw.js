@@ -1,6 +1,6 @@
 // ネットに つながる ときは かならず さいしんを とりに いく（ふるい ファイルと あたらしい ファイルが まざらない ように）。
 // つながらない ときは キャッシュを つかう。ファイルを ふやしたら FILES に たし、VERSION を あげる。
-const VERSION = 'g1';
+const VERSION = 'g2';
 const FILES = [
   './',
   'index.html',

@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0b0620">
   <title>ネオン ロボファーム</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -15,6 +15,7 @@
   <div id="play" class="hidden">
     <div id="hud">
       <div id="stamina" class="chip">🔋 <div class="bar"><i id="stBar"></i></div><span id="stNum">0</span></div>
+      <div id="oilChip" class="chip">🛢 <span id="oilNum">0</span></div>
       <div class="chip"><img class="ic s" id="coinIc" alt=""> <span id="moneyNum">0</span>G</div>
       <div class="chip">📅 <span id="dayNum">1</span>にちめ</div>
       <div id="tidyChip" class="chip">🧹 かたづけ <span id="tidyNum">0/10</span></div>
@@ -80,13 +81,13 @@
   </div>
 
   <!-- ?v= は ファイルを かえたら あげる（ふるい js と あたらしい html が まざらない ように） -->
-  <script src="config.js?v=3"></script>
-  <script src="bridge.js?v=3"></script>
-  <script src="sprites.js?v=3"></script>
-  <script src="world.js?v=3"></script>
-  <script src="ui.js?v=3"></script>
-  <script src="cutin.js?v=3"></script>
-  <script src="game.js?v=3"></script>
+  <script src="config.js?v=4"></script>
+  <script src="bridge.js?v=4"></script>
+  <script src="sprites.js?v=4"></script>
+  <script src="world.js?v=4"></script>
+  <script src="ui.js?v=4"></script>
+  <script src="cutin.js?v=4"></script>
+  <script src="game.js?v=4"></script>
   <script>
     window.addEventListener('load', () => { document.getElementById('coinIc').src = iconURL('coin'); });
   </script>

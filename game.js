@@ -5,6 +5,7 @@
 
 const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pickOne = (a) => a[(Math.random() * a.length) | 0];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const G = {
@@ -123,7 +124,8 @@ function wakeUp(added) {
       `でんち🔋 じゅうでん ${unlimitedStamina() ? '∞' : added}。\nでんちぎれ から ふっき します… ロボ、きどう！`,
       'ここは… はかせの けんきゅうじょ？\nはかせは… いない みたい。',
       'けんきゅうじょは くずれかけて、がらくただらけ。\nまずは かたづけから はじめよう！',
-      'がらくたの まえで Ⓐボタン を おすと もちあげられるよ。\nロッカー まで はこんで、もういちど Ⓐ で しまおう。',
+      'ギシギシ… からだも さびついて いる。オイル🛢も すくない…\nあとで オイルを さそう。',
+      'がらくたの まえで Ⓐボタン を おすと もちあげられるよ。\n「ごうせい そうち」まで はこんで、もういちど Ⓐ で いれよう。\nなにかが でて くるかも！',
       'うごいたり ものを もつと でんち🔋が へるよ。\nさんすうアプリで「じつりょくテスト」を やると、また かみなりで じゅうでん できるよ！',
     ], () => {
       s.flags.intro = true;
@@ -157,6 +159,7 @@ function backToTitle() {
 
 function spend(n) {
   const s = G.save;
+  useOil(CFG.oil.perAction);
   if (unlimitedStamina()) return true;
   if (s.stamina < n) {
     Sfx.play('err');
@@ -171,6 +174,37 @@ function spend(n) {
   UI.hud();
   addFx(`-${n}🔋`, '#7dff9a');
   return true;
+}
+
+// ---------- オイル🛢 ----------
+// うごく たび・どうぐを つかう たび・1にち ごとに へる。すくないと あるくのが おそく なり、ギシギシ いう
+
+function oilSpeed() {
+  const o = G.save.oil;
+  for (const [min, k] of CFG.oilSlow) if (o >= min) return k;
+  return CFG.oilSlow[CFG.oilSlow.length - 1][1];
+}
+
+function useOil(n) {
+  const s = G.save;
+  const before = s.oil;
+  s.oil = Math.max(0, s.oil - n);
+  if (before >= 25 && s.oil < 25) UI.toast('ギシギシ… オイル🛢が すくなく なって きた。うごきが わるい…', 2600);
+  UI.hud();
+}
+
+function oilUp(id) {
+  const s = G.save;
+  const o = OILS[id];
+  if (!(s.items[id] > 0)) return;
+  if (--s.items[id] <= 0) delete s.items[id];
+  s.oil = Math.min(100, s.oil + o.oil);
+  Sfx.play('oil');
+  addFx(`+${o.oil}🛢`, '#f2c94c');
+  UI.toast(`${o.name}を さした！ うごきが なめらかに なった`);
+  UI.hud();
+  if (UI.panelOpen) UI.rebuild();
+  persist();
 }
 
 // さんすうアプリから とどいた でんちを とりこむ（とどくと かみなりが おちる）
@@ -331,12 +365,14 @@ function update(dt) {
   if (!G.save) return;
   const p = G.p;
   if (p.moving) {
-    p.t += dt * partFx('walk', 'legs');
+    p.t += dt * partFx('walk', 'legs') * oilSpeed();
     if (p.t >= 1) {
       p.x = p.tx;
       p.y = p.ty;
       p.moving = false;
       p.t = 0;
+      useOil(CFG.oil.perStep);
+      if (G.save.oil < 25 && Math.random() < 0.3) Sfx.play('squeak');
       arrived();
     }
   }
@@ -412,7 +448,7 @@ function canUseDoor(door) {
     return false;
   }
   if (G.save.tidy.carry) {
-    UI.say('もっている ものを ロッカーに しまってから でかけよう。');
+    UI.say('もっている ものを ごうせい そうちに いれてから でかけよう。');
     return false;
   }
   return true;
@@ -443,8 +479,9 @@ function goThrough(door) {
         UI.say([
           'そとに でた！ むらは しーんと して いる…',
           'みぎの ほうに いけが ある。\nみずの まえで つりざおを えらんで Ⓐ！',
-          'つった さかなは、けんきゅうじょの よこの「しゅっかばこ」で おかねに なるよ。',
-          'みちの さきで、なにかが ネオンの ひかりで ひかって いる…',
+          'つった さかなは とって おこう。\n「かんづめ せいさく そうち」を つくると、しゅっかばこで おかねに できるよ。',
+          'けんきゅうじょの まわりに きいろい はなが さいて いる。なのはな かな？',
+          'みちには こわれた きかいも おちて いる…',
         ]);
       }
     });
@@ -463,10 +500,10 @@ function doAction() {
   const [tx, ty] = frontTile();
   const o = objAt(m, tx, ty);
   if (s.tidy.carry) {
-    if (o && o.act === 'closet') storeClutter();
+    if (o && o.act === 'synth') synthClutter();
     else {
       Sfx.play('err');
-      UI.toast('ロッカーの まえで Ⓐ を おして しまおう');
+      UI.toast('ごうせい そうちの まえで Ⓐ を おして いれよう');
     }
     return;
   }
@@ -490,15 +527,13 @@ const ACT = {
     G.save.tidy.carry = o.cid;
     Sfx.play('pick');
     const c = CLUTTER.find((x) => x.id === o.cid);
-    UI.toast(`${c.name}を もちあげた！ ロッカーへ はこぼう`);
+    UI.toast(`${c.name}を もちあげた！ ごうせい そうちへ はこぼう`);
     persist();
   },
-  closet() {
-    const n = G.save.tidy.stored.length;
-    UI.say(n >= CLUTTER.length
-      ? 'ロッカーの なかは きれいに かたづいて いる。'
-      : `ロッカー。がらくたを ここに しまおう。（${n}/${CLUTTER.length}）`);
-  },
+  synth() { openSynth(); },
+  press(o) { usePress(o); },
+  wild(o) { pickWild(o); },
+  scrap(o) { pickScrap(o); },
   bed() {
     UI.ask('スリープ ポッド。ロボは ここで スリープ モードに なる。\nスリープ して あしたに する？\n（みずを あげた やさいが そだつよ。でんち🔋は ふえないよ）', ['スリープ', 'まだ'], (k) => {
       if (k === 0) sleep();
@@ -523,25 +558,221 @@ const ACT = {
   signPond() { UI.say('「いけ」\nみずの まえで つりざおを つかおう。\nうきが しずんだら Ⓐ！'); },
 };
 
-function storeClutter() {
+// ---------- ごうせい そうち ----------
+// がらくたや もちものを いれると、SYNTH の かくりつで なにか でる。だいじな もの（MILESTONES）は かたづけた かずで かならず でる
+
+// かくりつで ひとつ きめて もちものに いれる。でた もの { name, icon } か null
+function rollSynth(kind) {
+  const s = G.save;
+  let pick = null;
+  if (kind === 'machine' && s.synthMiss >= SCREW_PITY) pick = 'm_screw';
+  else {
+    let r = Math.random();
+    for (const [id, p] of SYNTH[kind]) {
+      if (r < p) { pick = id; break; }
+      r -= p;
+    }
+  }
+  if (kind === 'machine') s.synthMiss = pick === 'm_screw' ? 0 : s.synthMiss + 1;
+  if (!pick) return null;
+  if (pick === 'seed') {
+    const k = pickOne(SYNTH_SEEDS);
+    s.seeds[k] = (s.seeds[k] || 0) + 1;
+    return { name: `${CROPS[k].name}の たね`, icon: `seed_${k}` };
+  }
+  addItem(pick);
+  return { name: ITEMS[pick].name, icon: pick };
+}
+
+const gotLine = (got) => (got ? `ポン！「${got.name}」が でてきた！` : 'ぷしゅー… なにも でなかった');
+
+function synthClutter() {
   const s = G.save;
   const c = CLUTTER.find((x) => x.id === s.tidy.carry);
   s.tidy.carry = null;
   s.tidy.stored.push(c.id);
   const n = s.tidy.stored.length;
-  Sfx.play('store');
+  Sfx.play('synth');
   if (n === 5) for (const o of G.map.objs.filter((x) => x.web)) removeObj(G.map, o);
   const ms = MILESTONES[n];
+  const extra = c.machine ? rollSynth('machine') : null; // こわれた きかいは ねじが でる かも
   if (ms) {
     giveMilestone(ms.give);
     setTimeout(() => Sfx.play('power'), 150);
     const lines = ms.lines.map((t) => t.replace('{n}', c.name));
     if (ms.give === 'rod') lines.push('かたづけの つづきも できるし、そとへ でかけても いいよ！');
+    if (extra) lines.push(`それから… ${gotLine(extra)}`);
     UI.say(lines);
   } else {
-    UI.toast(`${c.name}を しまった！（${n}/${CLUTTER.length}）`);
+    const got = extra || rollSynth('clutter');
+    if (got) setTimeout(() => Sfx.play('power'), 150);
+    UI.toast(`${c.name}を いれた… ${gotLine(got)}（${n}/${CLUTTER.length}）`, 2600);
   }
   UI.hud();
+  UI.hotbar();
+  persist();
+}
+
+// もちものを いれる ときの しゅるい（いれられない ものは null）
+function synthKind(id) {
+  const cat = ITEMS[id] && ITEMS[id].cat;
+  if (cat === 'machine') return 'machine';
+  if (cat === 'junk') return 'junk';
+  if (cat === 'fish' || cat === 'crop') return 'food';
+  return null;
+}
+
+function openSynth() {
+  Sfx.play('beep');
+  UI.panel('ごうせい そうち', (box) => {
+    const s = G.save;
+    const left = CLUTTER.length - s.tidy.stored.length;
+    box.appendChild(el('p', 'help', `ものを いれると、ウィーン… なにかが でて くるかも！<br>こわれた きかいからは ねじが でる ことが あるよ。${left ? `<br>けんきゅうじょの がらくたも もって きて いれよう（のこり ${left}こ）` : ''}`));
+    const list = Object.entries(s.items).filter(([id, n]) => n > 0 && synthKind(id));
+    if (!list.length) {
+      box.appendChild(el('p', 'empty', 'いま いれられる ものが ないよ。<br>（こわれた きかい・いし・あきかん・ながぐつ・さかな・やさい を いれられるよ）'));
+      return;
+    }
+    for (const [id, n] of list) {
+      const row = el('div', 'row');
+      row.innerHTML = `${iconImg(id, 'ic m')}<div class="info"><div class="nm">${ITEMS[id].name} × ${n}</div><div class="ds">${synthKind(id) === 'machine' ? 'ねじ や てつくずが でる かも' : synthKind(id) === 'junk' ? 'てつくずが でる かも' : 'たねが でる かも'}</div></div>`;
+      const bb = el('div', 'btns');
+      const bt = el('button', 'buy', 'いれる');
+      bt.onclick = () => putSynth(id);
+      bb.appendChild(bt);
+      row.appendChild(bb);
+      box.appendChild(row);
+    }
+  });
+}
+
+function putSynth(id) {
+  const s = G.save;
+  if (!(s.items[id] > 0)) return;
+  if (!spend(CFG.cost.tidy)) return;
+  if (--s.items[id] <= 0) delete s.items[id];
+  Sfx.play('synth');
+  const got = rollSynth(synthKind(id));
+  if (got) setTimeout(() => Sfx.play('power'), 200);
+  UI.toast(gotLine(got), 2200);
+  UI.rebuild();
+  UI.hotbar();
+  persist();
+}
+
+// ---------- オイル しぼりき ----------
+
+function takeItems(need) {
+  const s = G.save;
+  for (const [id, n] of Object.entries(need)) if ((s.items[id] || 0) < n) return false;
+  for (const [id, n] of Object.entries(need)) if ((s.items[id] -= n) <= 0) delete s.items[id];
+  return true;
+}
+
+function usePress(o) {
+  const s = G.save;
+  if (s.flags.pressFixed) {
+    openPress();
+    return;
+  }
+  const need = PRESS_FIX.m_screw;
+  if ((s.items.m_screw || 0) < need) {
+    UI.say([
+      'こわれた オイル しぼりき。ねじが 1ぽん とれて いる…',
+      'ねじが あれば なおせそう。\n（こわれた きかいを ごうせい そうちに いれると、ねじが でる ことが あるよ）',
+    ]);
+    return;
+  }
+  UI.ask(`こわれた オイル しぼりき。\nねじを ${need}こ つかって なおす？`, ['なおす', 'やめる'], (k) => {
+    if (k !== 0 || !takeItems(PRESS_FIX)) return;
+    s.flags.pressFixed = true;
+    o.spr = 'pressOk';
+    Sfx.play('power');
+    UI.say(['ギュッ ギュッ… ねじを しめた！', 'オイル しぼりきが なおった！\nなのはなや ごまを いれると オイルが できるよ。']);
+    persist();
+  });
+}
+
+function openPress() {
+  Sfx.play('ui');
+  UI.panel('オイル しぼりき', (box) => {
+    const s = G.save;
+    box.appendChild(el('div', 'wallet', `🛢 ロボの オイル <b>${Math.round(s.oil)}</b> / 100`));
+    for (const [id, o] of Object.entries(OILS)) {
+      const have = s.items[o.from] || 0;
+      const row = el('div', 'row');
+      row.innerHTML = `${iconImg(id, 'ic m')}<div class="info"><div class="nm">${o.name}</div><div class="ds">${ITEMS[o.from].name} ${o.need}こ → 1こ（さすと 🛢+${o.oil}）。もっている ${ITEMS[o.from].name}：${have}こ</div></div>`;
+      const bb = el('div', 'btns');
+      const bt = el('button', `buy${have < o.need ? ' off' : ''}`, 'しぼる');
+      bt.onclick = () => pressMake(id);
+      bb.appendChild(bt);
+      row.appendChild(bb);
+      box.appendChild(row);
+    }
+    oilRows(box);
+  });
+}
+
+function pressMake(id) {
+  const o = OILS[id];
+  if ((G.save.items[o.from] || 0) < o.need) {
+    Sfx.play('err');
+    UI.toast(`${ITEMS[o.from].name}が ${o.need}こ いるよ`);
+    return;
+  }
+  if (!spend(CFG.cost.tidy)) return;
+  takeItems({ [o.from]: o.need });
+  addItem(id);
+  Sfx.play('press');
+  UI.toast(`ギュギュッ… ${o.name}が できた！`);
+  UI.rebuild();
+  persist();
+}
+
+// もっている オイルを さす ボタン（もちもの・しぼりき）
+function oilRows(box) {
+  const s = G.save;
+  const have = Object.keys(OILS).filter((id) => s.items[id] > 0);
+  if (!have.length) return;
+  box.appendChild(el('p', 'help', '<b>オイルを さす</b>（こうえきが できる ように なったら うる ことも できるよ）'));
+  for (const id of have) {
+    const row = el('div', 'row');
+    row.innerHTML = `${iconImg(id, 'ic m')}<div class="info"><div class="nm">${OILS[id].name} × ${s.items[id]}</div><div class="ds">さすと 🛢+${OILS[id].oil}</div></div>`;
+    const bb = el('div', 'btns');
+    const bt = el('button', 'buy', 'さす');
+    bt.onclick = () => oilUp(id);
+    bb.appendChild(bt);
+    row.appendChild(bb);
+    box.appendChild(row);
+  }
+}
+
+// ---------- そとの なのはな・こわれた きかい ----------
+
+function pickWild(o) {
+  const s = G.save;
+  if (!wildReady(s, o.wid)) {
+    UI.toast(`なのはなは また さくまで まとう（とってから ${CFG.wildRegrow}にち）`);
+    return;
+  }
+  if (!spend(CFG.cost.tidy)) return;
+  s.wild[o.wid] = s.day;
+  o.spr = 'wildPicked';
+  addItem('c_nanohana');
+  Sfx.play('harvest');
+  addFx('なのはな！', '#fff07a', (o.x + 0.5) * T, o.y * T);
+  UI.toast('なのはなを とった！ しぼりきで オイルに できるよ', 2400);
+  persist();
+}
+
+function pickScrap(o) {
+  const s = G.save;
+  if (!spend(CFG.cost.tidy)) return;
+  removeObj(G.map, o);
+  s.picked.push(o.sid);
+  addItem('scrap');
+  Sfx.play('pick');
+  UI.toast('こわれた きかいを ひろった！ ごうせい そうちに いれて みよう', 2400);
   persist();
 }
 
@@ -720,6 +951,8 @@ function sleep() {
       if (pl.c && pl.c.d >= CROPS[pl.c.id].days) ready++;
     }
     s.day++;
+    useOil(CFG.oil.perDay);
+    for (const o of G.maps.out.objs) if (o.t === 'wild') o.spr = wildReady(s, o.wid) ? 'wild' : 'wildPicked';
     G.p.dir = 'down';
     persist();
     UI.hud();
@@ -731,6 +964,7 @@ function sleep() {
         Sfx.play('morning');
         const lines = [`ピピッ… ${s.day}にちめの あさ。スリープ かいじょ！`];
         if (grown) lines.push(`みずを あげた やさいが そだったよ！${ready ? `\nしゅうかく できる やさいが ${ready}こ あるよ！` : ''}`);
+        if (s.oil < 25) lines.push('ギシギシ… オイル🛢が すくないよ。\nしぼりきで オイルを つくって、もちもの🎒から さそう！');
         if (s.stamina < 10 && !unlimitedStamina()) lines.push('でんち🔋が すくないね。\nさんすうアプリの「じつりょくテスト」で かみなりを おとして じゅうでん しよう！');
         UI.say(lines);
       }, 600);
@@ -1007,34 +1241,39 @@ function openShop() {
   });
 }
 
-// ---------- しゅっかばこ ----------
+// ---------- しゅっかばこ・かんづめ せいさく そうち ----------
+// さかなと やさいは かんづめに しないと しゅっか できない。そうちは そざい（CANNER_RECIPE）で つくる
 
 function sellable() {
-  return Object.entries(G.save.items).filter(([id, n]) => n > 0 && ITEMS[id]);
+  return Object.entries(G.save.items).filter(([id, n]) => n > 0 && ITEMS[id] && (ITEMS[id].cat === 'fish' || ITEMS[id].cat === 'crop'));
 }
 
 function openSell() {
-  if (!sellable().length) {
-    UI.say('しゅっかばこ。\nさかなや やさいを いれると おかねに なるよ。\n（いまは うれる ものが ないよ）');
+  const s = G.save;
+  if (!s.flags.canner) {
+    openCanner();
     return;
   }
-  UI.panel('しゅっかばこ', (box) => {
+  if (!sellable().length) {
+    UI.say('かんづめ せいさく そうち。\nさかなや やさいを いれると、かんづめに して しゅっか できるよ。\n（いまは しゅっか できる ものが ないよ）');
+    return;
+  }
+  UI.panel('かんづめ せいさく そうち', (box) => {
     const list = sellable();
-    const s = G.save;
     box.appendChild(el('div', 'wallet', `${iconImg('coin', 'ic s')} もっている おかね <b>${s.money}G</b>`));
     if (!list.length) {
-      box.appendChild(el('p', 'empty', 'ぜんぶ うれたよ！'));
+      box.appendChild(el('p', 'empty', 'ぜんぶ しゅっか したよ！'));
       return;
     }
     const total = list.reduce((a, [id, n]) => a + ITEMS[id].sell * n, 0);
-    const all = el('button', 'big', `ぜんぶ うる（${total}G）`);
+    const all = el('button', 'big', `ぜんぶ かんづめに して しゅっか（${total}G）`);
     all.onclick = () => sell(list.map(([id]) => id));
     box.appendChild(all);
     for (const [id, n] of list) {
       const it = ITEMS[id];
       const row = el('div', 'row');
       row.innerHTML = `${iconImg(id, 'ic m')}<div class="info"><div class="nm">${it.name} × ${n}</div><div class="ds">1こ ${it.sell}G</div></div><div class="pr">${it.sell * n}G</div>`;
-      const b = el('button', 'buy', 'うる');
+      const b = el('button', 'buy', 'しゅっか');
       b.onclick = () => sell([id]);
       const bb = el('div', 'btns');
       bb.appendChild(b);
@@ -1042,6 +1281,37 @@ function openSell() {
       box.appendChild(row);
     }
   });
+}
+
+function openCanner() {
+  Sfx.play('ui');
+  UI.panel('しゅっかばこ', (box) => {
+    const s = G.save;
+    box.appendChild(el('p', 'help', 'さかなや やさいは、かんづめに しないと しゅっか できない…<br><b>「かんづめ せいさく そうち」</b>を つくろう！<br>（てつくず・ねじは、ごうせい そうちに ものを いれると でて くるよ）'));
+    let ok = true;
+    for (const [id, n] of Object.entries(CANNER_RECIPE)) {
+      const have = s.items[id] || 0;
+      if (have < n) ok = false;
+      const row = el('div', `row${have < n ? ' weak' : ''}`);
+      row.innerHTML = `${iconImg(id, 'ic m')}<div class="info"><div class="nm">${ITEMS[id].name}</div><div class="ds">${have >= n ? 'そろった！' : `あと ${n - have}こ`}</div></div><div class="pr">${Math.min(have, n)} / ${n}</div>`;
+      box.appendChild(row);
+    }
+    const bt = el('button', `big${ok ? '' : ' off'}`, ok ? '🔧 かんづめ せいさく そうちを つくる' : 'そざいが たりないよ');
+    bt.onclick = () => { if (ok) buildCanner(); };
+    box.appendChild(bt);
+  });
+}
+
+function buildCanner() {
+  const s = G.save;
+  if (!takeItems(CANNER_RECIPE)) return;
+  s.flags.canner = true;
+  const bin = G.maps.out.objs.find((o) => o.t === 'bin');
+  if (bin) bin.spr = 'canner';
+  UI.closePanel();
+  Sfx.play('power');
+  UI.say(['ガシャン ガシャン… ウィーン！', '「かんづめ せいさく そうち」が できた！', 'さかなや やさいを かんづめに して、しゅっか できる ように なったよ！']);
+  persist();
 }
 
 function sell(ids) {
@@ -1055,7 +1325,7 @@ function sell(ids) {
   s.money += total;
   s.totals.earned += total;
   Sfx.play('coin');
-  UI.toast(`${total}G に なった！`);
+  UI.toast(`かんづめに して しゅっか！ ${total}G に なった！`);
   UI.rebuild();
   UI.hud();
   persist();
@@ -1100,16 +1370,17 @@ function openBag() {
       }
       return;
     }
-    box.appendChild(el('div', 'wallet', `🔋 でんち <b>${unlimitedStamina() ? '∞' : s.stamina}</b> / ${CFG.staminaMax}　${iconImg('coin', 'ic s')} <b>${s.money}G</b>`));
+    box.appendChild(el('div', 'wallet', `🔋 でんち <b>${unlimitedStamina() ? '∞' : s.stamina}</b> / ${CFG.staminaMax}　🛢 オイル <b>${Math.round(s.oil)}</b>　${iconImg('coin', 'ic s')} <b>${s.money}G</b>`));
     const grid = el('div', 'grid');
     const cell = (icon, name, n) => {
       const c = el('div', 'cell', `${iconImg(icon, 'ic m')}${n != null ? `<b>${n}</b>` : ''}<span>${name}</span>`);
       grid.appendChild(c);
     };
     for (const it of hotbarItems()) cell(it.icon, it.name, it.n);
-    for (const [id, n] of sellable()) cell(id, ITEMS[id].name, n);
+    for (const [id, n] of Object.entries(s.items)) if (n > 0 && ITEMS[id]) cell(id, ITEMS[id].name, n);
     if (!grid.children.length) box.appendChild(el('p', 'empty', 'まだ なにも もって いないよ。'));
     else box.appendChild(grid);
+    oilRows(box);
   });
 }
 
@@ -1125,7 +1396,7 @@ function openMenu() {
       box.appendChild(b);
     };
     box.appendChild(el('p', 'help', `<b>${esc(G.profile.name)}</b> ・ ${s.day}にちめ<br>つった さかな ${s.totals.fish}ひき ・ しゅうかく ${s.totals.harvest}こ ・ かせいだ おかね ${s.totals.earned}G`));
-    box.appendChild(el('p', 'help', '🔋 でんちは、さんすうアプリの「じつりょくテスト」を やると かみなりが おちて、てんすう ぶん じゅうでん されるよ。<br>うごいたり、どうぐを つかうと へるよ。スリープ しても ふえないよ。'));
+    box.appendChild(el('p', 'help', '🔋 でんちは、さんすうアプリの「じつりょくテスト」を やると かみなりが おちて、てんすう ぶん じゅうでん されるよ。<br>うごいたり、どうぐを つかうと へるよ。スリープ しても ふえないよ。<br>🛢 オイルは うごくと へって、すくないと うごきが わるく なるよ。しぼりきで つくって さそう。'));
     add(Sfx.mute ? '🔇 おと：なし' : '🔊 おと：あり', () => { Sfx.mute = !Sfx.mute; UI.rebuild(); });
     add('👪 こどもを かえる', () => backToTitle());
     add('🧮 さんすうアプリに もどる', () => {
@@ -1136,6 +1407,8 @@ function openMenu() {
       box.appendChild(el('p', 'help', 'おとな（テスト）メニュー'));
       add('⚡ かみなりで でんちを 50 とどける（じつりょくテストの かわり）', () => { grantGameStamina(G.pid, 50, 'テスト'); UI.closePanel(); checkGrants(); });
       add('🪙 +500G', () => { s.money += 500; UI.hud(); persist(); UI.rebuild(); });
+      add('🔩 ねじ +3・てつくず +8', () => { addItem('m_screw', 3); addItem('m_scrap', 8); persist(); UI.rebuild(); });
+      add('🛢 オイル 100', () => { s.oil = 100; UI.hud(); persist(); UI.rebuild(); });
       add(G.infinite ? '🔋 でんち むげん：オン' : '🔋 でんち むげん：オフ', () => { G.infinite = !G.infinite; UI.hud(); UI.rebuild(); });
       add('🧹 けんきゅうじょを ぜんぶ かたづける', () => {
         while (s.tidy.stored.length < CLUTTER.length) {
@@ -1169,7 +1442,7 @@ function openMenu() {
 // ものの かげ（よこの はんけい・たての はんけい）
 const SHADOW = {
   tree: [24, 6], bush: [15, 4], rock: [12, 3], vend: [30, 4], bin: [28, 4], sign: [9, 3],
-  clutter: [12, 3], reed: [6, 2], table: [28, 4], closet: [30, 3], charger: [30, 3], bed: [30, 3],
+  clutter: [12, 3], reed: [6, 2], table: [28, 4], synth: [30, 3], press: [28, 3], charger: [30, 3], bed: [30, 3], wild: [8, 2], scrap: [12, 3],
 };
 
 function resize() {
