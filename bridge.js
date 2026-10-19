@@ -79,7 +79,10 @@ function newSave() {
     wild: {},                                   // そとの なのはなを とった ひ（id → day）
     picked: [],                                 // ひろった みちの こわれた きかい（id）
     synthMiss: 0,                               // こわれた きかいを いれて ねじが でなかった かず（SCREW_PITY）
-    flags: {},                                  // awake：めを さました・pressFixed：しぼりきを なおした・canner：かんづめ そうちを つくった
+    cargo: {},                                  // ドローンに つんだ もの（id → かず）
+    drone: null,                                // まちへ うりに いって いる ドローン { gold, n }（つぎの あさ かえる）
+    revival: 0,                                 // なおした ふっこう けいかくの かず（REVIVAL）
+    flags: {},                                  // awake：めを さました・pressFixed：しぼりきを なおした・port：しゅうしゅうばこを なおした・canner：かんづめ そうちを つくった・ending：むらが ふっこう した
     pos: { map: 'house', x: 5, y: 3, dir: 'up' }, // じゅうでんきの まえで とまっている
     totals: { fish: 0, harvest: 0, earned: 0 },
   };

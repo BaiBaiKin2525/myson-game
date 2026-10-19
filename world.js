@@ -150,6 +150,7 @@ function buildOutside(save) {
   for (const x of [21, 22, 23]) path(x, 8);
   for (let y = 10; y <= 12; y++) path(30, y);
   for (let x = 13; x <= 15; x++) path(x, 8);
+  for (let y = 10; y <= 24; y++) path(20, y); // ひろばと えきへ
 
   // まわりの もり（とおれない）
   for (let y = 0; y < H; y++) {
@@ -172,8 +173,22 @@ function buildOutside(save) {
   refreshCell(m, di);
   m.doors.push({ x: 16, y: 7, to: 'house', tx: 6, ty: 8, dir: 'up' });
 
-  // しゅっかばこ（かんづめ せいさく そうちを つくると かわる）
-  addObj(m, { t: 'bin', spr: save.flags.canner ? 'canner' : 'bin', x: 12, y: 7, w: 2, h: 1, solid: true, act: 'bin' });
+  // しゅうしゅうばこ（ドローン ポート。なおすと ドローンで まちへ うりに いける）と、となりの かんづめ せいさく そうち
+  addObj(m, { t: 'port', spr: save.flags.port ? 'port' : 'portBroken', x: 12, y: 7, w: 2, h: 1, solid: true, act: 'port' });
+  addObj(m, { t: 'canner', spr: save.flags.canner ? 'canner' : 'canSite', x: 10, y: 7, w: 2, h: 1, solid: true, act: 'canner' });
+  // ふっこう する ひろば と えき（save.revival：なおした けいかくの かず）
+  const done = (id) => REVIVAL.findIndex((r) => r.id === id) < (save.revival || 0);
+  addObj(m, { t: 'board', spr: 'board', x: 21, y: 10, solid: true, act: 'board' });
+  for (const [x, y] of [[19, 12], [21, 16], [19, 19], [21, 21]]) addObj(m, { t: 'lamp', spr: done('lights') ? 'lamp' : 'lampOff', x, y, solid: true, act: 'lamp' });
+  addObj(m, { t: 'fountain', spr: done('fountain') ? 'fountain' : 'fountainRuin', x: 22, y: 17, w: 2, h: 2, solid: true, act: 'ruin', rid: 'fountain' });
+  addObj(m, { t: 'cottage', spr: done('house') ? 'cottage' : 'cottageRuin', x: 16, y: 14, w: 3, h: 3, solid: true, act: 'ruin', rid: 'house' });
+  addObj(m, { t: 'market', spr: done('market') ? 'market' : 'marketRuin', x: 22, y: 12, w: 3, h: 2, solid: true, act: 'ruin', rid: 'market' });
+  addObj(m, { t: 'station', spr: done('station') ? 'station' : 'stationRuin', x: 21, y: 23, w: 4, h: 2, solid: true, act: 'ruin', rid: 'station' });
+  for (let x = 2; x < W - 2; x++) addObj(m, { t: 'deco', spr: 'rail', x, y: 25, flat: true });
+  REVIVAL.forEach((r, i) => {
+    if (i >= (save.revival || 0)) return;
+    for (const id of r.back) addObj(m, { t: 'npc', spr: `npc_${id}`, x: NPCS[id].x, y: NPCS[id].y, solid: true, act: 'npc', nid: id });
+  });
   // なのはな（とっても CFG.wildRegrow にち たつと また さく）と、みちの こわれた きかい
   for (const w of WILD) addObj(m, { t: 'wild', spr: wildReady(save, w.id) ? 'wild' : 'wildPicked', x: w.x, y: w.y, solid: true, act: 'wild', wid: w.id });
   for (const sc of SCRAPS) {
@@ -231,6 +246,7 @@ function buildOutside(save) {
     if (x < 3 || y < 3 || x > W - 4 || y > H - 4) return true;
     if (x >= FARM.x0 - 2 && x <= FARM.x1 + 2 && y >= FARM.y0 - 2 && y <= FARM.y1 + 2) return true;
     if (x >= 11 && x <= 25 && y >= 2 && y <= 11) return true;
+    if (x >= 14 && x <= 27 && y >= 10 && y <= 25) return true; // ひろば と えき
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
       const t = tileAt(m, x + dx, y + dy);
       if (t === TL.WATER || t === TL.SAND || t === TL.PATH) return true;

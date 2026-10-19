@@ -83,6 +83,8 @@ const Sfx = {
         oil: () => [440, 554, 659, 880].forEach((f, i) => this.tone(f, 0.12, 'sine', 0.14, i * 0.07)),
         synth: () => { this.tone(220, 0.35, 'sawtooth', 0.06, 0, 880); this.noise(0.15, 0.08, 0.3); },
         press: () => { this.noise(0.1, 0.15); this.tone(160, 0.2, 'square', 0.08, 0.1, 120); },
+        drone: () => { this.tone(180, 0.9, 'sawtooth', 0.04, 0, 520); this.tone(240, 0.9, 'square', 0.02, 0.05, 600); },
+        train: () => { this.tone(660, 0.5, 'square', 0.1); this.tone(880, 0.7, 'square', 0.1, 0.45); this.noise(0.6, 0.08, 0.2); },
         beep: () => { this.tone(1320, 0.06, 'square', 0.06); this.tone(1760, 0.08, 'square', 0.06, 0.08); },
       };
       if (S[name]) S[name]();

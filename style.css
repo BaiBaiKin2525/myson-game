@@ -594,3 +594,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* オイル・そうち */
 #oilChip.low { background: rgba(140, 40, 20, 0.85); animation: blink 1.2s infinite; }
 .big.off { opacity: 0.5; }
+
+/* ふっこう けいかく・ドローン */
+.step { flex: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; background: #232731; color: #5ff6ff; border: 3px solid #5ff6ff; }
+.step.done { background: #7dff9a; color: #14301c; border-color: #3a8a4a; }
+.big.go { background: linear-gradient(90deg, #5ff6ff, #ff4fd8); color: #14161e; }
