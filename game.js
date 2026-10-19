@@ -224,7 +224,7 @@ function setupInput() {
     e.preventDefault();
     UI.closeCatch();
   });
-  $('fishUI').addEventListener('pointerdown', (e) => {
+  $('fishPanel').addEventListener('pointerdown', (e) => {
     e.preventDefault();
     pressA();
   });
@@ -307,6 +307,7 @@ function update(dt) {
     }
   }
   if (G.fishing) fishUpdate(dt);
+  cutinFrame(dt);
   for (const f of G.fx) f.t += dt;
   G.fx = G.fx.filter((f) => f.t < 1);
   if (G.splash) {
@@ -661,6 +662,12 @@ function sleep() {
 }
 
 // ---------- つり ----------
+// なげる → さかなが よってくる（approach）
+// → まえあたり：うきが「ツン」と すこし しずむ（nibble。ここで Aを おすと にげる）
+// → ほんあたり：うきが スパッと しずむ（bite。さかなごとの みじかい じかんの うちに A）
+// → リール（reel：メーターの みどりで A）
+
+const rnd = (a, b) => a + Math.random() * (b - a);
 
 function startFishing(tx, ty) {
   if (tileAt(G.map, tx, ty) !== TL.WATER) {
@@ -670,8 +677,25 @@ function startFishing(tx, ty) {
   }
   if (!spend(CFG.cost.cast)) return;
   Sfx.play('cast');
-  const [a, b] = CFG.biteWait;
-  G.fishing = { state: 'wait', t: 0, wait: a + Math.random() * (b - a), tx, ty };
+  const pick = pickFish();
+  const junk = pick.id.startsWith('j_');
+  const f = {
+    state: 'approach', t: 0, since: 0, tx, ty, dir: G.p.dir,
+    item: pick.id, spec: pick.spec, junk, dip: 0, nib: 0,
+    wait: rnd(CFG.approach[0], CFG.approach[1]) * (junk ? 0.6 : 1),
+  };
+  // まえあたりの よてい（ごみは まえあたり なしで ずずっと しずむ）
+  const n = junk ? 0 : Math.round(rnd(CFG.nibbles[0], CFG.nibbles[1]));
+  f.sched = [];
+  let at = 0.25;
+  for (let i = 0; i < n; i++) {
+    f.sched.push(at);
+    at += rnd(CFG.nibbleGap[0], CFG.nibbleGap[1]);
+  }
+  f.biteAt = (n ? f.sched[n - 1] : 0) + rnd(CFG.biteDelay[0], CFG.biteDelay[1]);
+  f.cut = cutinStart(f);
+  G.fishing = f;
+  UI.cutin(true);
 }
 
 function pickFish() {
@@ -680,7 +704,7 @@ function pickFish() {
   for (const [k, f] of Object.entries(FISH)) {
     if (f.tier <= tier) pool.push({ id: `f_${k}`, w: f.tier < tier ? f.w * 0.6 : f.w, spec: f });
   }
-  for (const [k, j] of Object.entries(JUNK)) pool.push({ id: `j_${k}`, w: j.w, spec: { zone: 0.42, hits: 1, speed: 0.6 } });
+  for (const [k, j] of Object.entries(JUNK)) pool.push({ id: `j_${k}`, w: j.w, spec: j });
   let r = Math.random() * pool.reduce((a, x) => a + x.w, 0);
   for (const x of pool) {
     r -= x.w;
@@ -691,20 +715,37 @@ function pickFish() {
 
 function newZone(f) {
   let c;
-  do c = f.zw / 2 + Math.random() * (1 - f.zw); while (Math.abs(c - f.zc) < 0.2 && Math.random() < 0.9);
+  do c = f.zw / 2 + Math.random() * (1 - f.zw); while (Math.abs(c - f.zc) < 0.25 && Math.random() < 0.9);
   f.zc = c;
 }
 
 function fishUpdate(dt) {
   const f = G.fishing;
   f.t += dt;
-  if (f.state === 'wait' && f.t >= f.wait) {
-    f.state = 'bite';
+  f.since += dt;
+  f.dip = Math.max(0, f.dip - dt);
+  if (f.state === 'approach' && f.t >= f.wait) {
+    f.state = 'nibble';
     f.t = 0;
-    Sfx.play('bite');
-    try { navigator.vibrate && navigator.vibrate(80); } catch { /* なし */ }
-  } else if (f.state === 'bite' && f.t > CFG.biteWindow) {
-    endFishing('あ… にげられちゃった');
+  }
+  if (f.state === 'nibble') {
+    while (f.nib < f.sched.length && f.t >= f.sched[f.nib]) {
+      f.nib++;
+      f.dip = 0.2;
+      Sfx.play('nibble');
+      UI.cutText('ツン');
+      cutinEvent(f, 'nibble');
+    }
+    if (f.t >= f.biteAt) {
+      f.state = 'bite';
+      f.t = 0;
+      Sfx.play(f.junk ? 'heavy' : 'sink');
+      UI.cutText(f.junk ? 'ずずっ…' : 'スパッ！');
+      cutinEvent(f, 'bite');
+      try { navigator.vibrate && navigator.vibrate(80); } catch { /* なし */ }
+    }
+  } else if (f.state === 'bite' && f.t > f.spec.bite) {
+    endFishing(f.junk ? 'あれ？ なにかに ひっかかって いたのかな…' : 'あ… えさだけ とられちゃった');
   } else if (f.state === 'reel') {
     const u = (f.t * f.speed) % 2;
     f.pos = u < 1 ? u : 2 - u;
@@ -714,28 +755,34 @@ function fishUpdate(dt) {
 
 function fishPress() {
   const f = G.fishing;
-  if (f.state === 'wait') {
-    UI.toast('まだ だよ… うきが しずむまで まってね', 1200);
+  if (f.state === 'approach') {
+    UI.toast('まだ だよ… うきを よく みてね', 1100);
+    return;
+  }
+  if (f.state === 'nibble') {
+    endFishing('はやすぎた！ さかなが にげちゃった');
     return;
   }
   if (f.state === 'bite') {
-    const pick = pickFish();
     const bonus = G.save.tools.rod >= 2 ? 1.2 : 1;
     Object.assign(f, {
-      state: 'reel', t: 0, item: pick.id, need: pick.spec.hits, hits: 0, miss: 0,
-      zw: Math.min(0.6, pick.spec.zone * bonus), zc: 0.5, speed: pick.spec.speed, pos: 0,
+      state: 'reel', t: 0, need: f.spec.hits, hits: 0, miss: 0,
+      zw: Math.min(0.5, f.spec.zone * bonus), zc: 0.5, speed: f.spec.speed, pos: 0,
     });
     newZone(f);
-    UI.fishMsg('かかった！ みどりの ところで Ⓐ！');
+    UI.fishMsg(f.junk ? 'なにか かかった！ みどりで Ⓐ！' : 'かかった！ みどりの ところで Ⓐ！');
     UI.fishGauge(true);
     UI.fishDraw(f);
+    UI.cutText(f.junk ? 'ずるずる…' : 'グググッ');
+    cutinEvent(f, 'reel');
     Sfx.play('hit');
     return;
   }
   if (f.state === 'reel') {
-    if (Math.abs(f.pos - f.zc) <= f.zw / 2 + 0.01) {
+    if (Math.abs(f.pos - f.zc) <= f.zw / 2) {
       f.hits++;
       Sfx.play('hit');
+      cutinEvent(f, 'hit');
       if (f.hits >= f.need) {
         landFish();
         return;
@@ -758,7 +805,7 @@ function fishPress() {
 function landFish() {
   const s = G.save;
   const id = G.fishing.item;
-  endFishing();
+  endFishing(null, true);
   addItem(id);
   let isNew = false;
   if (id.startsWith('f_')) {
@@ -772,10 +819,14 @@ function landFish() {
   UI.catchCard(id, isNew);
 }
 
-function endFishing(msg) {
-  if (!G.fishing) return;
+// caught：つれた（カットインは すぐ けす）。ちがう ときは さかなが にげる ところを すこし みせる
+function endFishing(msg, caught = false) {
+  const f = G.fishing;
+  if (!f) return;
   G.fishing = null;
   UI.fishGauge(false);
+  if (caught) UI.cutin(false);
+  else cutinFlee(f);
   if (msg) {
     Sfx.play('lose');
     UI.toast(msg);
@@ -1191,8 +1242,10 @@ function drawFishing(g, ppx, ppy) {
   const hx = ppx + 16 + dx * 10, hy = ppy + 14 + (dy > 0 ? 4 : 0);
   const tipX = hx + dx * 18, tipY = hy - 18 + dy * 8;
   let bx = f.tx * T + 16, by = f.ty * T + 18;
-  if (f.state === 'bite') by += Math.sin(G.time * 40) > 0 ? 3 : 1;
-  if (f.state === 'reel') { bx += Math.round(Math.sin(G.time * 13) * 3); by += 2; }
+  // うきは まえあたりで すこし しずみ、ほんあたりから あとは みずの なか
+  const sunk = f.state === 'bite' || f.state === 'reel';
+  if (f.dip > 0) by += 2;
+  if (f.state === 'reel') bx += Math.round(Math.sin(G.time * 13) * 3);
   g.strokeStyle = '#4a2e1a';
   g.lineWidth = 3;
   g.lineCap = 'round';
@@ -1209,19 +1262,20 @@ function drawFishing(g, ppx, ppy) {
   g.moveTo(tipX, tipY);
   g.quadraticCurveTo((tipX + bx) / 2, Math.max(tipY, by) + 8, bx, by - 3);
   g.stroke();
-  const r = ((G.time * 6) % 8) + 2;
-  g.strokeStyle = `rgba(220,245,255,${0.7 - r / 14})`;
+  const speed = sunk ? 14 : f.dip > 0 ? 10 : 5;
+  const r = ((G.time * speed) % 9) + 2;
+  g.strokeStyle = `rgba(220,245,255,${0.75 - r / 14})`;
   g.lineWidth = 1;
   g.beginPath();
-  g.ellipse(bx, by + 3, r * (f.state === 'wait' ? 1 : 1.6), r * 0.45, 0, 0, Math.PI * 2);
+  g.ellipse(bx, by + 3, r * (sunk ? 1.8 : 1.2), r * 0.45, 0, 0, Math.PI * 2);
   g.stroke();
-  g.drawImage(SP.bobber, Math.round(bx - 4), Math.round(by - 5));
-  if (f.state === 'bite') {
-    const ex = Math.round(ppx + 9), ey = Math.round(ppy - 42);
-    R(g, '#2b1a0e', ex - 1, ey - 1, 16, 22);
-    R(g, '#ffffff', ex, ey, 14, 20);
-    R(g, '#e8342e', ex + 5, ey + 3, 4, 10);
-    R(g, '#e8342e', ex + 5, ey + 15, 4, 3);
+  if (sunk) {
+    for (let i = 0; i < 5; i++) {
+      const a = G.time * 7 + i * 1.3;
+      R(g, '#e8f6ff', Math.round(bx + Math.cos(a) * 6), Math.round(by + 2 + Math.sin(a) * 2), 1, 1);
+    }
+  } else {
+    g.drawImage(SP.bobber, Math.round(bx - 4), Math.round(by - 5));
   }
 }
 

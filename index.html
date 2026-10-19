@@ -30,10 +30,13 @@
     <div id="hotbar"></div>
     <button id="btnA" aria-label="Aボタン">A</button>
 
-    <div id="fishUI" class="hidden">
-      <div id="fmsg"></div>
-      <div class="gauge"><div id="fzone"></div><div id="fcur"></div></div>
-      <div class="frow"><span id="fhits"></span><span id="fmiss"></span></div>
+    <div id="fishPanel" class="hidden">
+      <div id="cutWrap"><canvas id="cutin"></canvas><div id="cutText"></div></div>
+      <div id="fishUI" class="hidden">
+        <div id="fmsg"></div>
+        <div class="gauge"><div id="fzone"></div><div id="fcur"></div></div>
+        <div class="frow"><span id="fhits"></span><span id="fmiss"></span></div>
+      </div>
     </div>
   </div>
 
@@ -73,6 +76,7 @@
   <script src="sprites.js"></script>
   <script src="world.js"></script>
   <script src="ui.js"></script>
+  <script src="cutin.js"></script>
   <script src="game.js"></script>
   <script>
     window.addEventListener('load', () => { document.getElementById('coinIc').src = iconURL('coin'); });

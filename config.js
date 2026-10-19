@@ -8,26 +8,30 @@ const CFG = {
   starterStamina: 40,  // はじめて あそぶ ときの げんき
   // うごくと へる げんき
   cost: { tidy: 1, cast: 3, hoe: 3, weed: 2, rock: 4, water: 2, plant: 1 },
-  biteWait: [1.2, 3.2], // うきが しずむまでの びょう
-  biteWindow: 1.5,      // あたりの あと Aを おせる じかん
+  // つり：なげる → さかなが よってくる → まえあたり「ツン」を なんかいか → ほんあたり（うきが スパッと しずむ）
+  approach: [1.2, 3.0],   // さかなが よってくるまでの びょう
+  nibbles: [2, 3],        // まえあたりの かず（この あいだに Aを おすと にげる）
+  nibbleGap: [0.45, 1.0], // まえあたりの あいだの びょう
+  biteDelay: [0.35, 0.9], // さいごの まえあたり から ほんあたり までの びょう
   missesAllowed: 2,     // リールで まちがえて いい かず
   walkSpeed: 5.2,       // 1びょうに すすむ マス
 };
 
 // さかな。tier＝つりざおの つよさ（ぼろい 1、ふつう 2）、w＝でやすさ、zone＝みどりの はば、hits＝ひつような せいこう
+// speed＝メーターの はやさ、bite＝ほんあたりで Aを おせる びょう（おおきい さかなほど みじかい）
 const FISH = {
-  medaka: { name: 'メダカ',   sell: 8,   tier: 1, w: 30, zone: 0.36, hits: 1, speed: 0.7, kind: 'round', size: 1, col: ['#9a9468', '#e0dbaa', '#bdb88d'], desc: 'ちいさくて すばやい。むれで およぐ。' },
-  tanago: { name: 'タナゴ',   sell: 15,  tier: 1, w: 26, zone: 0.32, hits: 1, speed: 0.8, kind: 'round', size: 1, col: ['#86b8cc', '#efe0d2', '#e2705c'], desc: 'キラキラ ひかる ちいさな さかな。' },
-  funa:   { name: 'フナ',     sell: 24,  tier: 1, w: 22, zone: 0.30, hits: 1, speed: 0.9, kind: 'round', size: 2, col: ['#8e8a5a', '#d8cf94', '#76723f'], desc: 'いけに よく いる。じょうぶ。' },
-  dojo:   { name: 'ドジョウ', sell: 34,  tier: 1, w: 14, zone: 0.28, hits: 1, speed: 1.0, kind: 'thin',  size: 2, col: ['#a58a58', '#d7c08a', '#7f6a3a'], desc: 'どろの なかに かくれる。ひげが ある。' },
-  koi:    { name: 'コイ',     sell: 95,  tier: 2, w: 10, zone: 0.24, hits: 2, speed: 1.0, kind: 'round', size: 3, col: ['#e8742a', '#f6e6d0', '#d85a1a'], desc: 'おおきくて ちからもち。' },
-  namazu: { name: 'ナマズ',   sell: 150, tier: 2, w: 7,  zone: 0.22, hits: 2, speed: 1.1, kind: 'cat',   size: 3, col: ['#4b4f55', '#9aa0a6', '#33373c'], desc: 'ながい ひげの いけの ぬし。' },
-  unagi:  { name: 'ウナギ',   sell: 240, tier: 2, w: 4,  zone: 0.20, hits: 3, speed: 1.2, kind: 'eel',   size: 3, col: ['#3d3a2e', '#a39a72', '#2e2c22'], desc: 'にょろにょろ。なかなか つれない。' },
+  medaka: { name: 'メダカ',   sell: 8,   tier: 1, w: 30, zone: 0.26, hits: 1, speed: 1.0, bite: 0.7, kind: 'round', size: 1, col: ['#9a9468', '#e0dbaa', '#bdb88d'], desc: 'ちいさくて すばやい。むれで およぐ。' },
+  tanago: { name: 'タナゴ',   sell: 15,  tier: 1, w: 26, zone: 0.23, hits: 1, speed: 1.1, bite: 0.65, kind: 'round', size: 1, col: ['#86b8cc', '#efe0d2', '#e2705c'], desc: 'キラキラ ひかる ちいさな さかな。' },
+  funa:   { name: 'フナ',     sell: 24,  tier: 1, w: 22, zone: 0.21, hits: 1, speed: 1.2, bite: 0.6, kind: 'round', size: 2, col: ['#8e8a5a', '#d8cf94', '#76723f'], desc: 'いけに よく いる。じょうぶ。' },
+  dojo:   { name: 'ドジョウ', sell: 34,  tier: 1, w: 14, zone: 0.19, hits: 1, speed: 1.35, bite: 0.55, kind: 'thin',  size: 2, col: ['#a58a58', '#d7c08a', '#7f6a3a'], desc: 'どろの なかに かくれる。ひげが ある。' },
+  koi:    { name: 'コイ',     sell: 95,  tier: 2, w: 10, zone: 0.16, hits: 2, speed: 1.35, bite: 0.5, kind: 'round', size: 3, col: ['#e8742a', '#f6e6d0', '#d85a1a'], desc: 'おおきくて ちからもち。' },
+  namazu: { name: 'ナマズ',   sell: 150, tier: 2, w: 7,  zone: 0.14, hits: 2, speed: 1.5, bite: 0.45, kind: 'cat',   size: 3, col: ['#4b4f55', '#9aa0a6', '#33373c'], desc: 'ながい ひげの いけの ぬし。' },
+  unagi:  { name: 'ウナギ',   sell: 240, tier: 2, w: 4,  zone: 0.12, hits: 3, speed: 1.7, bite: 0.4, kind: 'eel',   size: 3, col: ['#3d3a2e', '#a39a72', '#2e2c22'], desc: 'にょろにょろ。なかなか つれない。' },
 };
 
 const JUNK = {
-  can:  { name: 'あきかん', sell: 1, w: 4 },
-  boot: { name: 'ながぐつ', sell: 1, w: 4 },
+  can:  { name: 'あきかん', sell: 1, w: 4, zone: 0.3, hits: 1, speed: 0.9, bite: 0.9 },
+  boot: { name: 'ながぐつ', sell: 1, w: 4, zone: 0.3, hits: 1, speed: 0.9, bite: 0.9 },
 };
 
 // やさい。seed＝たねの ねだん、days＝そだつまでに みずを あげる ひ

@@ -59,6 +59,9 @@ const Sfx = {
         err: () => this.tone(196, 0.18, 'square', 0.08, 0, 150),
         cast: () => { this.tone(300, 0.2, 'triangle', 0.15, 0, 700); this.noise(0.12, 0.1, 0.25); },
         bite: () => { this.tone(1046, 0.08, 'square', 0.1); this.tone(1046, 0.08, 'square', 0.1, 0.12); },
+        nibble: () => { this.tone(1500, 0.03, 'square', 0.05); this.tone(900, 0.05, 'triangle', 0.1, 0.02); },
+        sink: () => { this.noise(0.2, 0.3); this.tone(700, 0.2, 'sine', 0.18, 0, 160); },
+        heavy: () => this.tone(220, 0.4, 'triangle', 0.15, 0, 110),
         hit: () => this.tone(880, 0.07, 'triangle', 0.2),
         miss: () => this.tone(220, 0.12, 'sawtooth', 0.06),
         catch: () => [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.14, 'square', 0.08, i * 0.08)),
@@ -289,6 +292,18 @@ UI.closeCatch = () => {
 // ---------- つりの メーター ----------
 
 UI.fishGauge = (show) => $('fishUI').classList.toggle('hidden', !show);
+UI.cutin = (show) => {
+  $('fishPanel').classList.toggle('hidden', !show);
+  if (!show) $('cutText').className = '';
+};
+// 「ツン」「スパッ！」などの もじ
+UI.cutText = (text) => {
+  const e = $('cutText');
+  e.textContent = text;
+  e.className = '';
+  void e.offsetWidth;
+  e.className = 'pop';
+};
 UI.fishDraw = (f) => {
   $('fzone').style.left = `${(f.zc - f.zw / 2) * 100}%`;
   $('fzone').style.width = `${f.zw * 100}%`;
