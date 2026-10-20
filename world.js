@@ -1,5 +1,5 @@
 'use strict';
-// マップ：くずれかけた けんきゅうじょ（なか）と そと（はたけ・いけ・じどう はんばいき）。だれも いなくなった さびれた むら
+// マップ：100年 だれも いない けんきゅう室（なか）と そと（ネオンスポアで よごれた 水ろ・あれた はたけ）
 
 const TL = { GRASS: 0, PATH: 1, WATER: 2, SAND: 3, FLOOR: 4, WALL: 5, FACE: 6 };
 const FARM = { x0: 4, y0: 12, x1: 13, y1: 21 }; // たがやせる ところ
@@ -69,11 +69,11 @@ function objAt(m, x, y) {
 const walkable = (m, x, y) => x >= 0 && y >= 0 && x < m.w && y < m.h && !m.solid[y * m.w + x];
 const tileAt = (m, x, y) => (x < 0 || y < 0 || x >= m.w || y >= m.h ? -1 : m.tiles[y * m.w + x]);
 
-// ---------- けんきゅうじょの なか（14×10） ----------
+// ---------- けんきゅう室の なか（14×10） ----------
 
 function buildHouse(save) {
   const m = newMap('house', 14, 10);
-  m.name = 'はかせの けんきゅうじょ';
+  m.name = 'はかせの けんきゅう{室|しつ}';
   for (let y = 0; y < m.h; y++) {
     for (let x = 0; x < m.w; x++) {
       let t = TL.FLOOR;
@@ -87,22 +87,25 @@ function buildHouse(save) {
   addObj(m, { t: 'deco', spr: 'doorIn', x: 6, y: 9, flat: true });
   m.doors.push({ x: 6, y: 9, to: 'out', tx: 16, ty: 8, dir: 'down' });
 
-  addObj(m, { t: 'deco', spr: 'window', x: 3, y: 1, flat: true });
-  addObj(m, { t: 'deco', spr: 'window', x: 8, y: 1, flat: true });
+  addObj(m, { t: 'deco', spr: 'window', x: 5, y: 1, flat: true });
   addObj(m, { t: 'deco', spr: 'rug', x: 5, y: 6, w: 3, h: 2, flat: true });
   if ((save.tidy.stored || []).length < 5) {
     addObj(m, { t: 'deco', spr: 'cobweb', x: 1, y: 1, flat: true, web: true });
     addObj(m, { t: 'deco', spr: 'cobweb', x: 12, y: 1, flat: true, web: true, mirror: true });
   }
 
+  const fixed = save.fixed || {};
   addObj(m, { t: 'bed', spr: 'bed', x: 1, y: 2, w: 2, h: 2, solid: true, act: 'bed' });
-  // ごうせい そうち（がらくたや もちものを いれると なにか でる）
-  addObj(m, { t: 'synth', spr: 'synth', x: 10, y: 2, w: 2, h: 1, solid: true, act: 'synth' });
-  // オイル しぼりき（はじめは こわれている。ねじで なおす）
-  addObj(m, { t: 'press', spr: save.flags.pressFixed ? 'pressOk' : 'press', x: 7, y: 2, w: 2, h: 1, solid: true, act: 'press' });
-  // ロボが とまっていた じゅうでん そうち（ここに かみなりが おちて めを さます）
-  addObj(m, { t: 'charger', spr: 'charger', x: 4, y: 2, w: 2, h: 1, solid: true, act: 'charger' });
-  addObj(m, { t: 'table', spr: 'table', x: 7, y: 4, w: 2, h: 1, solid: true, act: 'table' });
+  // ロボが とまっていた じゅう電き（ここに かみなりが おちて 目を さます）
+  addObj(m, { t: 'charger', spr: 'charger', x: 3, y: 2, w: 2, h: 1, solid: true, act: 'charger' });
+  // かべの メインパネル（電池を 入れると うごき、はかせの ビデオが 見られる）
+  addObj(m, { t: 'panel', spr: fixed.panel ? 'panelOn' : 'panelOff', x: 6, y: 1, w: 2, h: 1, solid: true, act: 'panel' });
+  // オイル しぼりき・ごうせい そうち・サイバーか そうち（ちりょう ポッド）
+  addObj(m, { t: 'press', spr: fixed.press ? 'pressOk' : 'press', x: 8, y: 2, w: 2, h: 1, solid: true, act: 'press' });
+  addObj(m, { t: 'synth', spr: 'synth', x: 11, y: 2, w: 2, h: 1, solid: true, act: 'synth' });
+  addObj(m, { t: 'pod', spr: fixed.pod ? 'podOn' : 'podOff', x: 11, y: 4, w: 2, h: 2, solid: true, act: 'pod' });
+  // しつない プランター（4つ）
+  for (let i = 0; i < 4; i++) addObj(m, { t: 'pot', spr: fixed.planter ? 'potOk' : 'potBroken', x: 8 + i, y: 8, solid: true, act: 'pot', pid: i });
 
   const gone = new Set([...(save.tidy.stored || []), save.tidy.carry]);
   for (const c of CLUTTER) {
@@ -114,24 +117,25 @@ function buildHouse(save) {
 
 // ---------- そと（40×28） ----------
 
-// そとの なのはなが さいている か
+// そとの オイル草が さいている か
 const wildReady = (save, id) => {
   const d = (save.wild || {})[id];
   return d == null || save.day - d >= CFG.wildRegrow;
 };
 
+// 水ろの まんなか（y ごとに すこし まがる）
+const canalX = (y) => 32 + Math.round(Math.sin(y * 0.3) * 2);
+
 function buildOutside(save) {
   const W = 40, H = 28;
   const m = newMap('out', W, H);
   m.name = 'そと';
+  m.glow = !save.flags.cleanWater; // ネオンスポアで よごれて 光って いる（2しょうで きれいに なる）
   const r = RNG(2024);
   for (let i = 0; i < W * H; i++) m.v[i] = (r() * 4) | 0;
 
-  // いけ
-  const water = (x, y) => {
-    const dx = (x - 32) / 5.6, dy = (y - 18) / 5.2;
-    return dx * dx + dy * dy <= 1;
-  };
+  // 水ろ（きたから みなみへ ながれる）と すなの きし
+  const water = (x, y) => y >= 1 && y <= H - 2 && Math.abs(x - canalX(y)) <= 1;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (water(x, y)) setTile(m, x, y, TL.WATER);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
@@ -147,10 +151,7 @@ function buildOutside(save) {
   for (let x = 9; x <= 30; x++) path(x, 9);
   path(16, 8);
   for (let y = 10; y <= 11; y++) path(9, y);
-  for (const x of [21, 22, 23]) path(x, 8);
-  for (let y = 10; y <= 12; y++) path(30, y);
   for (let x = 13; x <= 15; x++) path(x, 8);
-  for (let y = 10; y <= 24; y++) path(20, y); // ひろばと えきへ
 
   // まわりの もり（とおれない）
   for (let y = 0; y < H; y++) {
@@ -159,46 +160,31 @@ function buildOutside(save) {
       if (!ring) continue;
       m.tsolid[y * W + x] = 1;
       refreshCell(m, y * W + x);
-      if ((x + y) % 2 === 0) {
+      if ((x + y) % 2 === 0 && m.tiles[y * W + x] !== TL.WATER) {
         const k = (x * 7 + y * 3) % 5;
         addObj(m, { t: 'tree', spr: k === 0 ? 'pine' : k % 2 ? 'tree' : 'tree2', x, y });
       }
     }
   }
 
-  // けんきゅうじょ（ドアの マスだけ とおれる）
+  // けんきゅう室（ドアの マスだけ とおれる）
   addObj(m, { t: 'house', spr: 'house', x: 14, y: 3, w: 6, h: 5, solid: true });
   const di = 7 * W + 16;
   m.og[di] = null;
   refreshCell(m, di);
   m.doors.push({ x: 16, y: 7, to: 'house', tx: 6, ty: 8, dir: 'up' });
 
-  // しゅうしゅうばこ（ドローン ポート。なおすと ドローンで まちへ うりに いける）と、となりの かんづめ せいさく そうち
-  addObj(m, { t: 'port', spr: save.flags.port ? 'port' : 'portBroken', x: 12, y: 7, w: 2, h: 1, solid: true, act: 'port' });
-  addObj(m, { t: 'canner', spr: save.flags.canner ? 'canner' : 'canSite', x: 10, y: 7, w: 2, h: 1, solid: true, act: 'canner' });
-  // ふっこう する ひろば と えき（save.revival：なおした けいかくの かず）
-  const done = (id) => REVIVAL.findIndex((r) => r.id === id) < (save.revival || 0);
-  addObj(m, { t: 'board', spr: 'board', x: 21, y: 10, solid: true, act: 'board' });
-  for (const [x, y] of [[19, 12], [21, 16], [19, 19], [21, 21]]) addObj(m, { t: 'lamp', spr: done('lights') ? 'lamp' : 'lampOff', x, y, solid: true, act: 'lamp' });
-  addObj(m, { t: 'fountain', spr: done('fountain') ? 'fountain' : 'fountainRuin', x: 22, y: 17, w: 2, h: 2, solid: true, act: 'ruin', rid: 'fountain' });
-  addObj(m, { t: 'cottage', spr: done('house') ? 'cottage' : 'cottageRuin', x: 16, y: 14, w: 3, h: 3, solid: true, act: 'ruin', rid: 'house' });
-  addObj(m, { t: 'market', spr: done('market') ? 'market' : 'marketRuin', x: 22, y: 12, w: 3, h: 2, solid: true, act: 'ruin', rid: 'market' });
-  addObj(m, { t: 'station', spr: done('station') ? 'station' : 'stationRuin', x: 21, y: 23, w: 4, h: 2, solid: true, act: 'ruin', rid: 'station' });
-  for (let x = 2; x < W - 2; x++) addObj(m, { t: 'deco', spr: 'rail', x, y: 25, flat: true });
-  REVIVAL.forEach((r, i) => {
-    if (i >= (save.revival || 0)) return;
-    for (const id of r.back) addObj(m, { t: 'npc', spr: `npc_${id}`, x: NPCS[id].x, y: NPCS[id].y, solid: true, act: 'npc', nid: id });
-  });
-  // なのはな（とっても CFG.wildRegrow にち たつと また さく）と、みちの こわれた きかい
+  // 水ろの ろかそうち（こわれて いる。2しょうで なおす）
+  addObj(m, { t: 'filter', spr: 'filterBroken', x: 28, y: 5, w: 2, h: 2, solid: true, act: 'filter' });
+  // オイル草（とっても CFG.wildRegrow 日 たつと また さく）と、みちの こわれた きかい
   for (const w of WILD) addObj(m, { t: 'wild', spr: wildReady(save, w.id) ? 'wild' : 'wildPicked', x: w.x, y: w.y, solid: true, act: 'wild', wid: w.id });
   for (const sc of SCRAPS) {
     if (!(save.picked || []).includes(sc.id)) addObj(m, { t: 'scrap', spr: 'c_machine', x: sc.x, y: sc.y, solid: true, act: 'scrap', sid: sc.id });
   }
-  addObj(m, { t: 'vend', spr: 'vend', x: 22, y: 7, w: 2, h: 1, solid: true, act: 'vend' });
   addObj(m, { t: 'sign', spr: 'sign', x: 10, y: 10, solid: true, act: 'signFarm' });
-  addObj(m, { t: 'sign', spr: 'sign', x: 29, y: 11, solid: true, act: 'signPond' });
+  addObj(m, { t: 'sign', spr: 'sign', x: 28, y: 10, solid: true, act: 'signCanal' });
 
-  // はたけの さく（うえの まんなかが いりぐち）
+  // はたけの さく（2しょうで ひらく。いまは くさぼうぼう）
   for (let x = FARM.x0 - 1; x <= FARM.x1 + 1; x++) {
     if (x !== 9) addObj(m, { t: 'fence', spr: 'fence', x, y: FARM.y0 - 1, solid: true });
     addObj(m, { t: 'fence', spr: 'fence', x, y: FARM.y1 + 1, solid: true });
@@ -207,28 +193,6 @@ function buildOutside(save) {
     addObj(m, { t: 'fence', spr: 'fenceV', x: FARM.x0 - 1, y, solid: true });
     addObj(m, { t: 'fence', spr: 'fenceV', x: FARM.x1 + 1, y, solid: true });
   }
-
-  // スイレンの は（みずの うえ）と ガマ（すなはま）
-  const lr = RNG(31);
-  const deep = [], shore = [];
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const t = tileAt(m, x, y);
-      const around = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => tileAt(m, x + dx, y + dy));
-      if (t === TL.WATER && around.every((a) => a === TL.WATER)) deep.push([x, y]);
-      if (t === TL.SAND && x > 31 && around.includes(TL.WATER)) shore.push([x, y]);
-    }
-  }
-  for (let k = 0; k < 5 && deep.length; k++) {
-    const [x, y] = deep.splice((lr() * deep.length) | 0, 1)[0];
-    addObj(m, { t: 'deco', spr: k === 0 ? 'lotus' : 'lily', x, y, flat: true });
-  }
-  for (let k = 0; k < 5 && shore.length; k++) {
-    const [x, y] = shore.splice((lr() * shore.length) | 0, 1)[0];
-    addObj(m, { t: 'reed', spr: 'reed', x, y });
-  }
-
-  // はたけは くさと いしで おおわれている（かりとった ところは もう でない）
   const cleared = new Set(save.cleared || []);
   const fr = RNG(77);
   for (let y = FARM.y0; y <= FARM.y1; y++) {
@@ -241,12 +205,26 @@ function buildOutside(save) {
     }
   }
 
+  // ガマ（すなの きし）
+  const lr = RNG(31);
+  const shore = [];
+  for (let y = 3; y < H - 3; y++) {
+    for (let x = 0; x < W; x++) {
+      const around = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => tileAt(m, x + dx, y + dy));
+      if (tileAt(m, x, y) === TL.SAND && around.includes(TL.WATER) && !objAt(m, x, y) && Math.abs(y - 9) > 2) shore.push([x, y]);
+    }
+  }
+  for (let k = 0; k < 6 && shore.length; k++) {
+    const [x, y] = shore.splice((lr() * shore.length) | 0, 1)[0];
+    addObj(m, { t: 'reed', spr: 'reed', x, y });
+  }
+
   // き・くさむら・はな
   const busy = (x, y) => {
     if (x < 3 || y < 3 || x > W - 4 || y > H - 4) return true;
     if (x >= FARM.x0 - 2 && x <= FARM.x1 + 2 && y >= FARM.y0 - 2 && y <= FARM.y1 + 2) return true;
     if (x >= 11 && x <= 25 && y >= 2 && y <= 11) return true;
-    if (x >= 14 && x <= 27 && y >= 10 && y <= 25) return true; // ひろば と えき
+    if (x >= 26 && x <= 31 && y >= 3 && y <= 8) return true; // ろかそうち
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
       const t = tileAt(m, x + dx, y + dy);
       if (t === TL.WATER || t === TL.SAND || t === TL.PATH) return true;

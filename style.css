@@ -599,3 +599,33 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .step { flex: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; background: #232731; color: #5ff6ff; border: 3px solid #5ff6ff; }
 .step.done { background: #7dff9a; color: #14301c; border-color: #3a8a4a; }
 .big.go { background: linear-gradient(90deg, #5ff6ff, #ff4fd8); color: #14161e; }
+
+/* ---------- ふりがな・1しょう ---------- */
+
+ruby { ruby-position: over; }
+rt { font-size: 0.5em; font-weight: 700; letter-spacing: 0; }
+#dialog { line-height: 2.1; }
+#dText { min-height: 84px; }
+#toast { line-height: 1.9; }
+.chip.goal { position: fixed; left: 10px; top: calc(var(--safe-t) + 64px); background: rgba(20, 10, 50, 0.85); border-color: rgba(127, 248, 255, 0.55); color: #e8fcff; white-space: normal; max-width: min(560px, 70vw); line-height: 1.8; }
+/* はかせの ビデオ：かいわの ひだりに ホログラム */
+#holoImg { display: none; position: absolute; left: 12px; top: 50%; margin-top: -60px; width: 120px; height: 120px; image-rendering: pixelated; filter: drop-shadow(0 0 10px rgba(95, 246, 255, 0.8)); animation: holo 1.6s infinite; }
+#dialog.holo #holoImg { display: block; }
+#dialog.holo { border-color: #3fc8d8; box-shadow: 0 0 0 3px #145a6a, 0 0 24px rgba(95, 246, 255, 0.45), 0 8px 0 rgba(0, 0, 0, 0.35); }
+#dialog.holo { padding-left: 146px; }
+#dialog.holo #dWho { left: 146px; background: #145a6a; }
+@media (max-width: 700px) { #holoImg { width: 72px; height: 72px; margin-top: -36px; } #dialog.holo { padding-left: 92px; } #dialog.holo #dWho { left: 92px; } }
+@keyframes holo { 50% { opacity: 0.8; transform: translateY(-2px); } }
+.row .vid { font-size: 34px; width: 48px; text-align: center; }
+#catch .pr.small { font-size: 15px; color: #6b5034; }
+/* なまえを きめる */
+.nameShow { text-align: center; margin: 4px 0 10px; }
+.nameShow span { display: inline-block; min-width: 220px; padding: 8px 18px; font-size: 34px; font-weight: 900; letter-spacing: 0.1em; background: #fff; border: 3px solid var(--wood); border-radius: 14px; }
+.kana { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin: 6px 0 10px; }
+.kana .k { padding: 8px 0; font-size: 21px; font-weight: 900; border-radius: 10px; border: 2px solid var(--paper-d); background: #fff; }
+.kana .k:active { background: #ffe9a8; }
+.kana .k.blank { visibility: hidden; }
+.nameBtns { display: flex; gap: 10px; }
+.nameBtns .big { flex: 1; }
+.nameBtns .ok { background: #6fd65a; border-color: #2f7a2a; box-shadow: 0 3px 0 #2f7a2a; }
+@media (max-width: 700px) { .kana { grid-template-columns: repeat(5, 1fr); } }

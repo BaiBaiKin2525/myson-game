@@ -55,13 +55,19 @@ const currentProfileId = () => Store.get(KEY.current, null);
 // おとなの デバッグ：さんすうアプリで「claude」を いれた たんまつ（または ?dev=1 の むげん スイッチ）では でんちが へらない
 const unlimitedStamina = () => Store.get(KEY.unlimited, false) === true || (G.dev && G.infinite);
 
-// ロボの おはなしに なった ときに 2 に した（1 の セーブは つかわず さいしょから）
-const SAVE_V = 2;
+// 2：ロボの おはなし。3：ロビタの せかいかん（DESIGN.md）。ふるい セーブは つかわず さいしょから（電池だけ ひきつぐ）
+const SAVE_V = 3;
 
 function newSave() {
   return {
     v: SAVE_V,
     created: new Date().toISOString(),
+    name: '',                                   // こどもが つけた ロボの なまえ（さいしょは ロビタ）
+    ch: 1,                                      // いまの しょう
+    fixed: {},                                  // 1しょうで なおした もの（CH1 の id → true）
+    videos: [],                                 // 見た はかせの ビデオ（ばんごう）
+    pots: [0, 1, 2, 3].map(() => ({ c: null, w: 0, f: 0 })), // しつない プランター（c：さくもつ、w：水、f：ひりょう）
+    gdex: {},                                   // つった 光る さかなの かず
     day: 1,
     money: 0,
     stamina: CFG.starterStamina,
@@ -79,18 +85,22 @@ function newSave() {
     wild: {},                                   // そとの なのはなを とった ひ（id → day）
     picked: [],                                 // ひろった みちの こわれた きかい（id）
     synthMiss: 0,                               // こわれた きかいを いれて ねじが でなかった かず（SCREW_PITY）
-    cargo: {},                                  // ドローンに つんだ もの（id → かず）
-    drone: null,                                // まちへ うりに いって いる ドローン { gold, n }（つぎの あさ かえる）
-    revival: 0,                                 // なおした ふっこう けいかくの かず（REVIVAL）
-    flags: {},                                  // awake：めを さました・pressFixed：しぼりきを なおした・port：しゅうしゅうばこを なおした・canner：かんづめ そうちを つくった・ending：むらが ふっこう した
-    pos: { map: 'house', x: 5, y: 3, dir: 'up' }, // じゅうでんきの まえで とまっている
+    flags: {},                                  // awake：目を さました・named：なまえを つけた・oiled：はじめて オイルを ぬった・ch1done：1しょう クリア
+    pos: { map: 'house', x: 4, y: 3, dir: 'up' }, // じゅう電きの まえで とまっている
     totals: { fish: 0, harvest: 0, earned: 0 },
   };
 }
 
 function loadSave(id) {
   const s = Store.get(KEY.save(id), null);
-  if (!s || s.v !== SAVE_V) return null;
+  if (!s) return null;
+  if (s.v !== SAVE_V) {
+    // ふるい おはなしの セーブ：さいしょから。ためた 電池と、とりこんだ とどけ（2かい はいらない ように）だけ ひきつぐ
+    const n = newSave();
+    n.stamina = Math.max(0, Math.min(CFG.staminaMax, Number(s.stamina) || 0));
+    n.seen = Array.isArray(s.seen) ? s.seen.slice(-500) : [];
+    return n;
+  }
   const base = newSave();
   return {
     ...base, ...s,
@@ -99,6 +109,7 @@ function loadSave(id) {
     tidy: { ...base.tidy, ...s.tidy },
     totals: { ...base.totals, ...s.totals },
     pos: { ...base.pos, ...s.pos },
+    pots: Array.isArray(s.pots) && s.pots.length === base.pots.length ? s.pots : base.pots,
   };
 }
 

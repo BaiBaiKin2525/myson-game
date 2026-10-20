@@ -105,15 +105,16 @@ function leaf(g, x, y, len, dir, c1, c2) {
 const GROUND_CACHE = {};
 
 function bakeGround(m) {
-  if (GROUND_CACHE[m.id]) {
-    m.ground = GROUND_CACHE[m.id];
+  const key = m.id + (m.glow ? ':glow' : '');
+  if (GROUND_CACHE[key]) {
+    m.ground = GROUND_CACHE[key];
     return;
   }
   const c = mk(m.w * T, m.h * T);
   const g = c.getContext('2d');
   if (m.id === 'house') bakeHouseFloor(m, g);
   else bakeOutside(m, g);
-  GROUND_CACHE[m.id] = c;
+  GROUND_CACHE[key] = c;
   m.ground = c;
 }
 
@@ -163,8 +164,9 @@ function bakeOutside(m, g) {
   const GR = ['#4a8f34', '#589f3c', '#68b246', '#78c050', '#8ccf5c'].map(hexRGB);
   const PA = ['#a77b4a', '#b98d58', '#c99f68', '#d8b27a', '#e3c38c'].map(hexRGB);
   const SA = ['#d4b77e', '#e1c992', '#ebd8a6', '#f3e4b8'].map(hexRGB);
-  const WA = ['#2a6aa6', '#3179b6', '#3b8ac4', '#4c9fd2', '#62b5df', '#7fcbe8'].map(hexRGB);
-  const FOAM = hexRGB('#c6eaf4'), WET = hexRGB('#c2a46e'), EDGE = hexRGB('#946a3e');
+  // ネオンスポアで よごれた 水は むらさきと みずいろに 光る
+  const WA = (m.glow ? ['#1c1450', '#2a1f78', '#33309c', '#3a52b8', '#3f86d0', '#5fd8ea'] : ['#2a6aa6', '#3179b6', '#3b8ac4', '#4c9fd2', '#62b5df', '#7fcbe8']).map(hexRGB);
+  const FOAM = hexRGB(m.glow ? '#d68aff' : '#c6eaf4'), WET = hexRGB(m.glow ? '#8f7a9a' : '#c2a46e'), EDGE = hexRGB('#946a3e');
   const img = g.createImageData(W, H), a = img.data;
   for (let py = 0; py < H; py++) {
     for (let px = 0; px < W; px++) {
@@ -310,7 +312,7 @@ function drawWaterSparkles(g, m, x0, y0, x1, y1, time) {
         if (ph > 1.2) continue;
         const w = ph < 0.6 ? 3 : 5;
         const px = x * T + 4 + Math.floor(hash2(x + k * 7, y) * 22), py = y * T + 4 + Math.floor(hash2(x, y + k * 9) * 22);
-        R(g, ph < 0.6 ? '#d8f2fb' : '#9fd8f0', px - (w >> 1), py, w, 1);
+        R(g, m.glow ? (ph < 0.6 ? '#7ff8ff' : '#d68aff') : ph < 0.6 ? '#d8f2fb' : '#9fd8f0', px - (w >> 1), py, w, 1);
       }
     }
   }
@@ -1929,15 +1931,158 @@ function buildIcons() {
   ICON.o_nanohana = oilIcon('#f2c94c', '#ffe68a');
   ICON.o_goma = oilIcon('#a8641e', '#d08a3e');
   for (const [k, f] of Object.entries(FISH)) ICON[`f_${k}`] = fishIcon(f);
+  // 光る すがた：ネオンの いろ と キラキラ
+  for (const [k, gl] of Object.entries(GLOW)) {
+    const base = fishIcon({ ...FISH[k], col: gl.col });
+    ICON[`g_${k}`] = make(32, 32, (g) => {
+      g.drawImage(base, 0, 0);
+      for (const [x, y, c] of [[4, 6, '#ffffff'], [26, 8, gl.col[2]], [7, 25, gl.col[2]], [24, 24, '#ffffff'], [15, 4, '#7ff8ff']]) {
+        R(g, c, x, y, 1, 1);
+        R(g, c, x - 1, y + 1, 3, 1);
+        R(g, c, x, y + 2, 1, 1);
+      }
+    });
+  }
+  ICON.m_kasu = oicon((g) => {
+    E(g, '#5a3a20', 15, 21, 13, 7);
+    E(g, '#7a5232', 14, 19, 12, 6);
+    for (const [x, y, rr] of [[8, 17, 3], [14, 14, 4], [21, 17, 3], [11, 21, 3], [19, 22, 3]]) {
+      E(g, '#9a6a3e', x, y, rr, rr - 1);
+      R(g, '#c08a52', x - 1, y - rr + 1, 2, 1);
+    }
+    R(g, '#7dff9a', 22, 6, 2, 6);
+    R(g, '#5fae45', 20, 8, 2, 2);
+    R(g, '#5fae45', 24, 9, 2, 2);
+  }, '#2a1a0a');
   for (const k of Object.keys(CROPS)) {
     ICON[`c_${k}`] = cropIcon(k);
     ICON[`seed_${k}`] = seedIcon(k);
   }
 }
 
+// ---------- 1しょう：けんきゅう室の きかい ----------
+
+function buildCh1() {
+  // メインパネル（かべの おおきな がめん）。off：まっくらで ひび、on：あおく 光って ビデオが うつる
+  const panel = (on) => osp(62, 46, (g) => {
+    R(g, '#2a2e38', 0, 0, 62, 42);
+    R(g, '#4a5058', 1, 1, 60, 2);
+    R(g, '#14161e', 4, 4, 54, 32);
+    if (on) {
+      for (let y = 0; y < 32; y++) R(g, y % 3 ? '#0f3a4a' : '#145a6a', 4, 4 + y, 54, 1);
+      E(g, '#5ff6ff', 31, 18, 9, 9);
+      E(g, '#0f3a4a', 31, 18, 7, 7);
+      E(g, '#7ff8ff', 31, 15, 4, 4);                 // はかせの あたま（ホログラム）
+      R(g, '#7ff8ff', 25, 21, 12, 8);
+      R(g, '#5ff6ff', 6, 6, 10, 2);
+      R(g, '#ff4fd8', 48, 6, 6, 2);
+      for (let x = 8; x < 56; x += 6) R(g, '#7dff9a', x, 32, 3, 2);
+    } else {
+      for (const [x, y, l] of [[14, 8, 9], [40, 20, 11]]) for (let i = 0; i < l; i++) R(g, '#3d434c', x + i, y + ((i * 7) % 3), 1, 1);
+      R(g, '#3d434c', 22, 26, 12, 1);
+    }
+    R(g, '#3d434c', 10, 40, 6, 6);
+    R(g, '#3d434c', 46, 40, 6, 6);
+    R(g, on ? '#7dff9a' : '#5a1a1a', 54, 37, 4, 2);
+  }, '#0b0d14');
+  SP.panelOff = panel(false);
+  SP.panelOn = panel(true);
+
+  // サイバーか そうち（ちりょう ポッド）。off：ガラスが われて さびている、on：うごくが 水が なくて あかい ランプ
+  const pod = (on) => osp(62, 76, (g) => {
+    R(g, '#2a2e38', 2, 54, 58, 22);
+    R(g, '#4a5058', 2, 54, 58, 3);
+    for (let x = 6; x < 58; x += 8) R(g, (x / 8) % 2 ? '#ffd23f' : '#1a1a1a', x, 70, 8, 3);
+    // ガラスの ドーム
+    E(g, '#14161e', 31, 32, 24, 26);
+    E(g, on ? '#2a6a7a' : '#2a2e38', 31, 32, 22, 24);
+    E(g, on ? '#5fd8ea' : '#3d434c', 31, 30, 19, 21);
+    E(g, on ? '#bff8ff' : '#4a5058', 25, 20, 5, 8);
+    R(g, '#14161e', 6, 46, 50, 9);
+    if (on) {
+      for (let y = 14; y < 50; y += 4) R(g, 'rgba(255,255,255,.25)', 18, y, 26, 1);
+      R(g, '#ff4f4f', 10, 59, 6, 4);                 // 水が ない（あかい ランプ）
+      R(g, '#7dff9a', 20, 59, 6, 4);
+      R(g, '#5ff6ff', 30, 59, 22, 4);
+    } else {
+      for (const [x, y, l, d] of [[20, 14, 12, 1], [36, 30, 10, -1], [28, 38, 8, 1]]) for (let i = 0; i < l; i++) R(g, '#14161e', x + i * d, y + i, 1, 1);
+      for (const [x, y] of [[8, 60], [40, 62], [50, 58]]) { R(g, '#7a4a2a', x, y, 4, 2); R(g, '#c07a44', x, y, 1, 1); }
+      R(g, '#3a1a1a', 10, 59, 6, 4);
+    }
+    // 水の タンク（よこ）
+    R(g, '#3d434c', 52, 20, 8, 34);
+    R(g, on ? '#1a2a3a' : '#2a2e38', 54, 22, 4, 30);
+  }, '#0b0d14');
+  SP.podOff = pod(false);
+  SP.podOn = pod(true);
+
+  // しつない プランター。broken：われて つちが こぼれている、ok：つちと ライト
+  const pot = (ok) => osp(30, 26, (g) => {
+    R(g, ok ? '#5d6470' : '#4a4440', 1, 8, 28, 18);
+    R(g, ok ? '#8a929e' : '#6a6460', 1, 8, 28, 2);
+    R(g, ok ? '#4a3020' : '#3a2a20', 3, 10, 24, 5);
+    R(g, ok ? '#6a4428' : '#4a3020', 3, 10, 24, 1);
+    if (ok) {
+      R(g, '#3d434c', 1, 0, 2, 9);
+      R(g, '#3d434c', 27, 0, 2, 9);
+      R(g, '#2a2e38', 1, 0, 28, 2);
+      R(g, '#ff7ae8', 4, 2, 22, 1);                  // そだつ ための ライト
+      R(g, '#7dff9a', 3, 22, 4, 2);
+    } else {
+      for (let i = 0; i < 9; i++) R(g, '#14161e', 12 + i, 12 + i, 1, 1);
+      R(g, '#3a2a20', 22, 23, 8, 3);
+      R(g, '#3a2a20', 0, 24, 5, 2);
+    }
+  }, '#0b0d14');
+  SP.potBroken = pot(false);
+  SP.potOk = pot(true);
+  SP.potWet = make(SP.potOk.width, SP.potOk.height, (g) => {
+    g.drawImage(SP.potOk, 0, 0);
+    R(g, '#2a1a10', 4, 11, 24, 5);
+    for (const x of [7, 13, 19, 24]) R(g, 'rgba(160,200,230,.6)', x, 12, 2, 1);
+  });
+
+  // 水ろの ろかそうち（こわれて いる。ネオンスポアが くっついて 光る）
+  SP.filterBroken = osp(62, 64, (g) => {
+    R(g, '#3d434c', 4, 18, 46, 46);
+    R(g, '#5d6470', 6, 18, 42, 3);
+    R(g, '#2a2e38', 50, 34, 12, 8);                  // 水ろへの パイプ
+    R(g, '#2a2e38', 18, 4, 14, 16);
+    E(g, '#4a5058', 25, 6, 8, 4);
+    R(g, '#14161e', 12, 28, 30, 18);
+    R(g, '#3a1a1a', 14, 30, 26, 2);
+    for (let x = 14; x < 40; x += 5) R(g, '#2a2e38', x, 32, 2, 12);
+    R(g, '#5a1a1a', 40, 50, 6, 4);
+    for (const [x, y] of [[8, 24], [44, 26], [10, 54], [30, 58], [22, 22], [54, 36]]) {
+      R(g, '#c08aff', x, y, 3, 3);
+      R(g, '#7ff8ff', x + 1, y + 1, 1, 1);
+    }
+    for (const [x, y] of [[36, 20], [6, 44]]) { R(g, '#7a4a2a', x, y, 4, 2); R(g, '#c07a44', x, y, 1, 1); }
+  }, '#0b0d14');
+
+  // はかせの ホログラム（ビデオの かお）
+  SP.holo = make(64, 64, (g) => {
+    E(g, 'rgba(95,246,255,.25)', 32, 34, 30, 30);
+    E(g, '#bff8ff', 32, 26, 14, 15);                 // かお
+    R(g, '#e8fcff', 18, 13, 28, 6);                  // しろい かみ
+    E(g, '#e8fcff', 20, 20, 5, 7);
+    E(g, '#e8fcff', 44, 20, 5, 7);
+    R(g, '#2a6a7a', 23, 25, 7, 5);                   // めがね
+    R(g, '#2a6a7a', 34, 25, 7, 5);
+    R(g, '#e8fcff', 25, 26, 3, 2);
+    R(g, '#e8fcff', 36, 26, 3, 2);
+    R(g, '#2a6a7a', 30, 27, 4, 1);
+    R(g, '#5fb8c8', 28, 34, 8, 2);                   // にっこり
+    E(g, '#7ff8ff', 32, 56, 20, 12);                 // はくい
+    R(g, '#bff8ff', 30, 44, 4, 20);
+    for (let y = 0; y < 64; y += 3) R(g, 'rgba(10,40,60,.35)', 0, y, 64, 1); // ホログラムの すじ
+  });
+}
+
 function buildSprites() {
   buildNature();
   buildBuildings();
+  buildCh1();
   buildPlayer();
   buildCrops();
   buildIcons();

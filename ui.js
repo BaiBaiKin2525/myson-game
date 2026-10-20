@@ -2,10 +2,42 @@
 // がめんの うえの もの：おと・おしらせ・かいわ・パネル（おみせ・もちもの）・HUD・ホットバー
 
 const $ = (id) => document.getElementById(id);
+
+// ---------- ふりがな ----------
+// もじの なかの {漢字|かんじ} を ふりがな（ルビ）つきに する。{name} は ロボの なまえ（こどもが つける）
+// かんじは しょうがく 2ねんせい までに ならう もの だけ つかう
+const RUBY_RE = /\{([^|{}]+)\|([^{}]+)\}/g;
+const escHTML = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const withName = (text) => String(text).replace(/\{name\}/g, (typeof G !== 'undefined' && G.save && G.save.name) || 'ロビタ');
+// ひともじずつ（ふりがなの ついた ことばは ひとかたまり）に わける。かいわの もじおくり で つかう
+function rubyTokens(text) {
+  const s = withName(text), out = [];
+  let i = 0, m;
+  RUBY_RE.lastIndex = 0;
+  while ((m = RUBY_RE.exec(s))) {
+    for (const ch of s.slice(i, m.index)) out.push(ch);
+    out.push({ b: m[1], r: m[2] });
+    i = RUBY_RE.lastIndex;
+  }
+  for (const ch of s.slice(i)) out.push(ch);
+  return out;
+}
+function tokensHTML(tokens, n = tokens.length) {
+  let h = '';
+  for (let k = 0; k < n; k++) {
+    const t = tokens[k];
+    h += typeof t === 'string' ? escHTML(t) : `<ruby>${escHTML(t.b)}<rt>${escHTML(t.r)}</rt></ruby>`;
+  }
+  return h;
+}
+const rt = (text) => tokensHTML(rubyTokens(text));                              // ふつうの もじ → HTML
+const rbh = (html) => withName(html).replace(RUBY_RE, '<ruby>$1<rt>$2</rt></ruby>'); // HTML の なかの ふりがな
+const kana = (text) => withName(text).replace(RUBY_RE, '$2');                    // よみ だけ（canvas の もじ・title など）
+
 const el = (tag, cls, html) => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
-  if (html != null) e.innerHTML = html;
+  if (html != null) e.innerHTML = rbh(html);
   return e;
 };
 const iconImg = (id, cls = 'ic') => `<img class="${cls}" src="${iconURL(id)}" alt="">`;
@@ -98,7 +130,7 @@ const UI = {};
 
 UI.toast = (msg, ms = 1900) => {
   const t = $('toast');
-  t.textContent = msg;
+  t.innerHTML = rt(msg);
   t.classList.add('show');
   clearTimeout(UI._tt);
   UI._tt = setTimeout(() => t.classList.remove('show'), ms);
@@ -108,7 +140,7 @@ UI.toast = (msg, ms = 1900) => {
 
 const Dlg = { open: false, lines: [], i: 0, shown: 0, cb: null };
 
-// lines：もじれつ か { who, text, choices: [ラベル], pick: (ばんごう) => {} } の ならび
+// lines：もじれつ か { who, text, choices: [ラベル], pick: (ばんごう) => {}, holo: はかせの ビデオ } の ならび
 UI.say = (lines, cb) => {
   Dlg.lines = (Array.isArray(lines) ? lines : [lines]).map((l) => (typeof l === 'string' ? { text: l } : l));
   Dlg.i = 0;
@@ -122,9 +154,11 @@ UI.ask = (text, choices, pick, who) => UI.say([{ who, text, choices, pick }]);
 
 function showLine() {
   const l = Dlg.lines[Dlg.i];
-  $('dWho').textContent = l.who || '';
+  l.tokens = rubyTokens(l.text);
+  $('dWho').innerHTML = l.who ? rt(l.who) : '';
   $('dWho').style.display = l.who ? '' : 'none';
-  $('dText').textContent = '';
+  $('dialog').classList.toggle('holo', !!l.holo);
+  $('dText').innerHTML = '';
   $('dChoices').innerHTML = '';
   $('dNext').style.visibility = 'hidden';
   Dlg.shown = 0;
@@ -132,13 +166,13 @@ function showLine() {
 
 function lineDone() {
   const l = Dlg.lines[Dlg.i];
-  $('dText').textContent = l.text;
-  Dlg.shown = l.text.length;
+  $('dText').innerHTML = tokensHTML(l.tokens);
+  Dlg.shown = l.tokens.length;
   if (l.choices) {
     const box = $('dChoices');
     box.innerHTML = '';
     l.choices.forEach((c, k) => {
-      const b = el('button', 'choice', c);
+      const b = el('button', 'choice', rt(c));
       b.onclick = (e) => {
         e.stopPropagation();
         Sfx.play('ui');
@@ -155,6 +189,7 @@ function lineDone() {
 function closeDialog() {
   Dlg.open = false;
   $('dialog').classList.add('hidden');
+  $('dialog').classList.remove('holo');
 }
 
 UI.dialogOpen = () => Dlg.open;
@@ -166,7 +201,7 @@ UI.offNote = (show) => $('offNote').classList.toggle('hidden', !show);
 UI.advance = () => {
   if (!Dlg.open) return;
   const l = Dlg.lines[Dlg.i];
-  if (Dlg.shown < l.text.length) {
+  if (Dlg.shown < l.tokens.length) {
     lineDone();
     return;
   }
@@ -185,17 +220,17 @@ UI.advance = () => {
 UI.tick = (dt) => {
   if (!Dlg.open) return;
   const l = Dlg.lines[Dlg.i];
-  if (Dlg.shown >= l.text.length) return;
-  Dlg.shown += dt * 40;
-  if (Dlg.shown >= l.text.length) lineDone();
-  else $('dText').textContent = l.text.slice(0, Math.floor(Dlg.shown));
+  if (Dlg.shown >= l.tokens.length) return;
+  Dlg.shown += dt * 34;
+  if (Dlg.shown >= l.tokens.length) lineDone();
+  else $('dText').innerHTML = tokensHTML(l.tokens, Math.floor(Dlg.shown));
 };
 
 // ---------- パネル ----------
 
 UI.panel = (title, build) => {
   UI._build = build;
-  $('panelTitle').textContent = title;
+  $('panelTitle').innerHTML = rt(title);
   UI.rebuild();
   $('panel').classList.remove('hidden');
   UI.panelOpen = true;
@@ -208,6 +243,7 @@ UI.rebuild = () => {
 UI.closePanel = () => {
   $('panel').classList.add('hidden');
   UI.panelOpen = false;
+  if (UI._onClose) { UI._onClose(); UI._onClose = null; }
 };
 
 // ---------- HUD ----------
@@ -224,7 +260,11 @@ UI.hud = () => {
   $('oilNum').textContent = Math.round(s.oil);
   $('oilChip').classList.toggle('low', s.oil < 25);
   $('moneyNum').textContent = s.money;
+  $('coinChip').style.display = s.money > 0 ? '' : 'none'; // おかねは 2しょう から（1しょうでは つかわない）
   $('dayNum').textContent = s.day;
+  const goal = typeof goalText === 'function' ? goalText() : '';
+  $('goalChip').style.display = goal && s.flags.awake ? '' : 'none';
+  $('goalText').innerHTML = rt(goal);
   const tidyChip = $('tidyChip');
   const n = s.tidy.stored.length;
   tidyChip.style.display = G.map && G.map.id === 'house' && n < CLUTTER.length ? '' : 'none';
@@ -247,6 +287,7 @@ function hotbarItems() {
   if (s.tools.net) list.push({ id: 'net', icon: 'net', name: TOOLS.net.name });
   if (s.tools.hoe) list.push({ id: 'hoe', icon: 'hoe', name: TOOLS.hoe.name });
   if (s.tools.can) list.push({ id: 'can', icon: 'can', name: TOOLS.can.name });
+  if (s.items.m_kasu > 0) list.push({ id: 'kasu', icon: 'm_kasu', name: 'あぶらかす（ひりょう）', n: s.items.m_kasu });
   for (const k of Object.keys(CROPS)) {
     if (s.seeds[k] > 0) list.push({ id: `seed:${k}`, icon: `seed_${k}`, name: `${CROPS[k].name}の たね`, n: s.seeds[k] });
   }
@@ -261,7 +302,7 @@ UI.hotbar = () => {
   if (s.sel && !list.some((x) => x.id === s.sel)) s.sel = list.length ? list[0].id : null;
   list.forEach((it, k) => {
     const b = el('button', `slot${s.sel === it.id ? ' on' : ''}`, `${iconImg(it.icon)}${it.n ? `<b>${it.n}</b>` : ''}<i>${k + 1}</i>`);
-    b.title = it.name;
+    b.title = kana(it.name);
     b.onpointerdown = (e) => {
       e.preventDefault();
       Sfx.init();
@@ -271,7 +312,7 @@ UI.hotbar = () => {
   });
   bar.style.display = list.length ? '' : 'none';
   const cur = list.find((x) => x.id === s.sel);
-  $('selName').textContent = cur ? cur.name : '';
+  $('selName').innerHTML = cur ? rt(cur.name) : '';
 };
 
 function selectItem(id) {
@@ -294,7 +335,8 @@ function cycleItem(step) {
 UI.catchCard = (itemId, isNew, cb) => {
   const it = ITEMS[itemId];
   const box = $('catch');
-  box.innerHTML = `<div class="card">${isNew ? '<div class="new">はじめて！</div>' : ''}${iconImg(itemId, 'ic big')}<div class="nm">${it.name}</div><div class="pr">${iconImg('coin', 'ic s')} ${it.sell}G</div><div class="tap">タップ / A で つぎへ</div></div>`;
+  const price = it.sell > 0 ? `<div class="pr">${iconImg('coin', 'ic s')} ${it.sell}G</div>` : (it.note ? `<div class="pr small">${it.note}</div>` : '');
+  box.innerHTML = rbh(`<div class="card">${isNew ? '<div class="new">はじめて！</div>' : ''}${iconImg(itemId, 'ic big')}<div class="nm">${it.name}</div>${price}<div class="tap">タップ / A で つぎへ</div></div>`);
   box.classList.remove('hidden');
   UI.catchOpen = true;
   UI._catchCb = cb;
@@ -330,3 +372,60 @@ UI.fishDraw = (f) => {
   $('fmiss').textContent = '💧'.repeat(Math.max(0, CFG.missesAllowed - f.miss + 1));
 };
 UI.fishMsg = (msg) => { $('fmsg').textContent = msg; };
+
+// ---------- ロボの なまえを きめる（ひらがな・カタカナの ボタン） ----------
+
+const KANA_ROWS = [
+  'あいうえお', 'かきくけこ', 'さしすせそ', 'たちつてと', 'なにぬねの', 'はひふへほ', 'まみむめも', 'や ゆ よ', 'らりるれろ', 'わ を ん',
+  'がぎぐげご', 'ざじずぜぞ', 'だぢづでど', 'ばびぶべぼ', 'ぱぴぷぺぽ', 'ぁぃぅぇぉ', 'ゃゅょっー',
+];
+const NAME_MAX = 6;
+const toKata = (ch) => (ch >= 'ぁ' && ch <= 'ゖ' ? String.fromCharCode(ch.charCodeAt(0) + 0x60) : ch);
+
+UI.nameEntry = (first, done) => {
+  const st = { name: first, kata: true };
+  UI.naming = true;
+  UI.panel('ロボットの {名前|なまえ}を きめよう', (box) => {
+    box.appendChild(el('div', 'nameShow', `<span>${escHTML(st.name) || '　'}</span>`));
+    const tabs = el('div', 'tabs');
+    for (const [k, label] of [[false, 'ひらがな'], [true, 'カタカナ']]) {
+      const b = el('button', `tab${st.kata === k ? ' on' : ''}`, label);
+      b.onclick = () => { st.kata = k; Sfx.play('ui'); UI.rebuild(); };
+      tabs.appendChild(b);
+    }
+    box.appendChild(tabs);
+    const grid = el('div', 'kana');
+    for (const row of KANA_ROWS) {
+      for (const ch0 of row) {
+        const ch = st.kata ? toKata(ch0) : ch0;
+        const b = el('button', ch0 === ' ' ? 'k blank' : 'k', ch0 === ' ' ? '' : escHTML(ch));
+        if (ch0 !== ' ') {
+          b.onclick = () => {
+            if ([...st.name].length >= NAME_MAX) { Sfx.play('err'); return; }
+            st.name += ch;
+            Sfx.play('ui');
+            UI.rebuild();
+          };
+        }
+        grid.appendChild(b);
+      }
+    }
+    box.appendChild(grid);
+    const bb = el('div', 'nameBtns');
+    const del = el('button', 'big', '⌫ 1もじ けす');
+    del.onclick = () => { st.name = [...st.name].slice(0, -1).join(''); Sfx.play('ui'); UI.rebuild(); };
+    const ok = el('button', 'big ok', '✔ これに する');
+    ok.onclick = () => {
+      if (!st.name) { Sfx.play('err'); UI.toast('{名前|なまえ}を 1もじ いじょう いれてね'); return; }
+      Sfx.play('power');
+      UI.naming = false;
+      UI.closePanel();
+      done(st.name);
+    };
+    bb.appendChild(del);
+    bb.appendChild(ok);
+    box.appendChild(bb);
+  });
+  $('panelClose').style.display = 'none'; // きめるまで とじられない
+  UI._onClose = () => { $('panelClose').style.display = ''; };
+};

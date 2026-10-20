@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0b0620">
   <title>ネオン ロボファーム</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,9 +16,10 @@
     <div id="hud">
       <div id="stamina" class="chip">🔋 <div class="bar"><i id="stBar"></i></div><span id="stNum">0</span></div>
       <div id="oilChip" class="chip">🛢 <span id="oilNum">0</span></div>
-      <div class="chip"><img class="ic s" id="coinIc" alt=""> <span id="moneyNum">0</span>G</div>
-      <div class="chip">📅 <span id="dayNum">1</span>にちめ</div>
+      <div id="coinChip" class="chip"><img class="ic s" id="coinIc" alt=""> <span id="moneyNum">0</span>G</div>
+      <div class="chip">📅 <span id="dayNum">1</span><ruby>日目<rt>にちめ</rt></ruby></div>
       <div id="tidyChip" class="chip">🧹 かたづけ <span id="tidyNum">0/10</span></div>
+      <div id="goalChip" class="chip goal"><span id="goalText"></span></div>
       <div class="sp"></div>
       <button id="bagBtn" class="round" aria-label="もちもの">🎒</button>
       <button id="menuBtn" class="round" aria-label="メニュー">☰</button>
@@ -44,6 +45,7 @@
   <div id="toast"></div>
 
   <div id="dialog" class="hidden">
+    <img id="holoImg" alt="">
     <div id="dWho"></div>
     <div id="dText"></div>
     <div id="dChoices"></div>
@@ -64,7 +66,7 @@
 
   <div id="offNote" class="hidden">
     <div class="bat">🔋 0</div>
-    <p>ロボは とまった まま うごかない…<br>さんすうアプリで「じつりょくテスト」を やってみよう！</p>
+    <p>ロボットは とまった まま うごかない…<br><ruby>算数<rt>さんすう</rt></ruby>アプリで「じつりょくテスト」を やってみよう！</p>
     <a id="offMath" class="tomath">🧮 さんすうアプリへ</a>
   </div>
 
@@ -72,24 +74,24 @@
     <div class="logo">
       <div class="sub">NEON ROBO FARM // 2099</div>
       <h1><span class="n1">ネオン</span> <span class="n2">ロボファーム</span></h1>
-      <div class="sub2">〜 かみなりで めざめた ロボと さびれた むら 〜</div>
+      <div class="sub2">〜 100<ruby>年<rt>ねん</rt></ruby><ruby>目<rt>め</rt></ruby>の ロボットと ネオンの<ruby>町<rt>まち</rt></ruby> 〜</div>
     </div>
     <p class="who">だれが あそぶ？</p>
     <div id="profiles"></div>
-    <p class="note">🔋 でんちは さんすうアプリの「じつりょくテスト」で かみなりが おちて じゅうでん されるよ</p>
+    <p class="note">🔋 <ruby>電池<rt>でんち</rt></ruby>は <ruby>算数<rt>さんすう</rt></ruby>アプリの「じつりょくテスト」で じゅう<ruby>電<rt>でん</rt></ruby> されるよ</p>
     <a id="toMath" class="tomath">🧮 さんすうアプリに もどる</a>
   </div>
 
   <!-- ?v= は ファイルを かえたら あげる（ふるい js と あたらしい html が まざらない ように） -->
-  <script src="config.js?v=5"></script>
-  <script src="bridge.js?v=5"></script>
-  <script src="sprites.js?v=5"></script>
-  <script src="world.js?v=5"></script>
-  <script src="ui.js?v=5"></script>
-  <script src="cutin.js?v=5"></script>
-  <script src="game.js?v=5"></script>
+  <script src="config.js?v=6"></script>
+  <script src="bridge.js?v=6"></script>
+  <script src="sprites.js?v=6"></script>
+  <script src="world.js?v=6"></script>
+  <script src="ui.js?v=6"></script>
+  <script src="cutin.js?v=6"></script>
+  <script src="game.js?v=6"></script>
   <script>
-    window.addEventListener('load', () => { document.getElementById('coinIc').src = iconURL('coin'); });
+    window.addEventListener('load', () => { document.getElementById('coinIc').src = iconURL('coin'); document.getElementById('holoImg').src = SP.holo.toDataURL(); });
   </script>
 </body>
 </html>
