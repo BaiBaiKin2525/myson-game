@@ -252,17 +252,21 @@ const gateOpen = (save, id) => {
   const g = GATES[id], f = save.flags || {};
   return !!f.allOpen || ((save.ch || 1) >= g.ch && (!g.flag || !!f[g.flag]));
 };
-function addGate(m, save, id, cells) {
+// line：{ row: y } なら その ぎょう、{ col: x } なら その れつの とおれる マスを ぜんぶ ふさぐ（まわりの じめんから まわりこめない ように）。
+// 道の 上は バリケード、それ いがいは がれき
+function addGate(m, save, id, line) {
   if (gateOpen(save, id)) return;
-  for (const [x, y] of cells) addObj(m, { t: 'gate', spr: (x + y) % 2 ? 'barricade' : 'barricade2', x, y, solid: true, act: 'gate', gid: id });
+  const n = line.row != null ? m.w : m.h;
+  for (let k = 0; k < n; k++) {
+    const x = line.row != null ? k : line.col, y = line.row != null ? line.row : k;
+    if (!walkable(m, x, y)) continue;
+    const o = objAt(m, x, y);
+    if (o) removeObj(m, o); // くさ など とおれる もの
+    const road = [TL.PATH, TL.PAVE, TL.PIER].includes(tileAt(m, x, y));
+    const spr = road ? ((x + y) % 2 ? 'barricade' : 'barricade2') : 'rubble';
+    addObj(m, { t: 'gate', spr, x, y, solid: true, act: 'gate', gid: id, road });
+  }
 }
-// その れつ（ぎょう）の 道を ぜんぶ ふさぐ（まがりかどで すきまが できない ように）
-const roadCells = (m, xs, ys) => {
-  const out = [];
-  for (const y of ys) for (const x of xs) if ([TL.PATH, TL.PAVE, TL.PIER].includes(tileAt(m, x, y))) out.push([x, y]);
-  return out;
-};
-const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 
 // まわりに ある もの が ない か（き・がれきを おく ときに よける）
 function busyFn(m, extra) {
@@ -304,10 +308,10 @@ function buildOutside(save) {
   ringWall(m);
 
   // となりの エリアへ：きたは ちゅうおう広場、みなみは 海
-  m.doors.push({ x0: roadX(canalX(0)), x1: roadX(canalX(0)) + 1, y: 0, to: 'plaza', ty: AH - 2, dir: 'up' });
-  m.doors.push({ x0: roadX(canalX(H - 1)), x1: roadX(canalX(H - 1)) + 1, y: H - 1, to: 'sea', ty: 1, dir: 'down' });
-  addGate(m, save, 'toPlaza', roadCells(m, range(24, 32), [3]));
-  addGate(m, save, 'toSea', roadCells(m, range(24, 34), [H - 4]));
+  m.doors.push({ x0: roadX(canalX(0)), x1: roadX(canalX(0)) + 1, y: 0, to: 'plaza', ty: AH - 2, dir: 'up', gate: 'toPlaza' });
+  m.doors.push({ x0: roadX(canalX(H - 1)), x1: roadX(canalX(H - 1)) + 1, y: H - 1, to: 'sea', ty: 1, dir: 'down', gate: 'toSea' });
+  addGate(m, save, 'toPlaza', { row: 3 });
+  addGate(m, save, 'toSea', { row: H - 4 });
 
   // けんきゅう室（ドアの マスだけ とおれる）
   addObj(m, { t: 'house', spr: 'house', x: 14, y: 3, w: 6, h: 5, solid: true });
@@ -403,10 +407,10 @@ function buildPlaza(save) {
   }
   ringWall(m);
   m.doors.push({ x0: roadX(plazaCanalX(H - 1)), x1: roadX(plazaCanalX(H - 1)) + 1, y: H - 1, to: 'out', ty: 1, dir: 'down' });
-  m.doors.push({ x0: roadX(plazaCanalX(0)), x1: roadX(plazaCanalX(0)) + 1, y: 0, to: 'mine', ty: AH - 2, dir: 'up' });
-  m.doors.push({ x: W - 1, y0: cy, y1: cy + 1, to: 'shop', tx: 1, dir: 'right' });
-  addGate(m, save, 'toMine', roadCells(m, range(22, 32), [3]));
-  addGate(m, save, 'toShop', roadCells(m, [W - 4], [cy, cy + 1]));
+  m.doors.push({ x0: roadX(plazaCanalX(0)), x1: roadX(plazaCanalX(0)) + 1, y: 0, to: 'mine', ty: AH - 2, dir: 'up', gate: 'toMine' });
+  m.doors.push({ x: W - 1, y0: cy, y1: cy + 1, to: 'shop', tx: 1, dir: 'right', gate: 'toShop' });
+  addGate(m, save, 'toMine', { row: 3 });
+  addGate(m, save, 'toShop', { col: W - 4 });
 
   // かれた 空気じょうか ツリー（4しょうで うごかす）・こわれた ベンチ・からっぽの かじゅえん
   addObj(m, { t: 'airTree', spr: 'airTreeDead', x: cx - 1, y: cy - 1, w: 3, h: 2, solid: true, act: 'airTree' });

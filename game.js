@@ -512,6 +512,10 @@ function canUseDoor(door) {
     UI.say('もっている ものを ごうせい そうちに {入|い}れてから でかけよう。');
     return false;
   }
+  if (door.gate && !gateOpen(G.save, door.gate)) {
+    ACT.gate({ gid: door.gate });
+    return false;
+  }
   if (G.save.carryOtter && door.to !== 'house' && door.to !== 'out') {
     UI.say('カワウソが ぐったり して いる… さきに けんきゅう{室|しつ}の サイバーか そうちへ はこぼう。');
     return false;
@@ -771,7 +775,7 @@ function tryFix(id, after, then) {
     UI.say([
       `${c.name}は こわれて いる…`,
       `{直|なお}すには ${matList(c.mats)}が いる。`,
-      'ガラクタや こわれた きかいを ごうせい そうちに {入|い}れると、てつくずや ねじが {出|で}るよ。',
+      'ガラクタや こわれた きかいを ごうせい そうちに {入|い}れると、てつくずや ねじが {出|で}るよ。つった さかなを {入|い}れても、ねじが {出|で}る ことが あるよ。',
     ]);
     return;
   }
@@ -1139,7 +1143,7 @@ function openSynth() {
   UI.panel('ごうせい そうち', (box) => {
     const s = G.save;
     const left = CLUTTER.length - s.tidy.stored.length;
-    box.appendChild(el('p', 'help', `ものを いれると、ウィーン… なにかが でて くるかも！<br>こわれた きかいからは ねじが でる ことが あるよ。${left ? `<br>けんきゅうじょの がらくたも もって きて いれよう（のこり ${left}こ）` : ''}`));
+    box.appendChild(el('p', 'help', `ものを いれると、ウィーン… なにかが でて くるかも！<br>こわれた きかいからは ねじが でる ことが あるよ。さかなも ときどき ねじを のみこんで いるよ。${left ? `<br>けんきゅうじょの がらくたも もって きて いれよう（のこり ${left}こ）` : ''}`));
     const list = Object.entries(s.items).filter(([id, n]) => n > 0 && synthKind(id));
     if (!list.length) {
       box.appendChild(el('p', 'empty', 'いま {入|い}れられる ものが ないよ。<br>（こわれた きかい・いし・ながぐつ・さかな・{野|や}さい を {入|い}れられるよ）'));
@@ -1148,7 +1152,7 @@ function openSynth() {
     for (const [id, n] of list) {
       const row = el('div', 'row');
       const k = synthKind(id);
-      row.innerHTML = rbh(`${iconImg(id, 'ic m')}<div class="info"><div class="nm">${ITEMS[id].name} × ${n}</div><div class="ds">${k === 'machine' ? 'ねじ や てつくずが でる かも' : k === 'junk' ? 'てつくずが でる かも' : k === 'glow' ? 'あぶらかす（ひりょう）が でるよ' : 'たねが でる かも'}</div></div>`);
+      row.innerHTML = rbh(`${iconImg(id, 'ic m')}<div class="info"><div class="nm">${ITEMS[id].name} × ${n}</div><div class="ds">${k === 'machine' ? 'ねじ や てつくずが でる かも' : k === 'junk' ? 'てつくずが でる かも' : k === 'glow' ? 'あぶらかす（ひりょう）が でるよ。ねじが でる ことも' : /^f_/.test(id) ? 'たね や ねじが でる かも' : 'たねが でる かも'}</div></div>`);
       const bb = el('div', 'btns');
       const bt = el('button', 'buy', 'いれる');
       bt.onclick = () => putSynth(id);
@@ -1166,8 +1170,10 @@ function putSynth(id) {
   if (--s.items[id] <= 0) delete s.items[id];
   Sfx.play('synth');
   const got = rollSynth(synthKind(id));
-  if (got) setTimeout(() => Sfx.play('power'), 200);
-  UI.toast(gotLine(got), 2200);
+  const fish = /^[fg]_/.test(id) && Math.random() < FISH_SCREW;
+  if (fish) addItem('m_screw');
+  if (got || fish) setTimeout(() => Sfx.play('power'), 200);
+  UI.toast(fish ? `${gotLine(got)}\n…あれ？ ねじも 1こ {出|で}て きた！ さかなが ねじを のみこんで いた みたい` : gotLine(got), fish ? 3600 : 2200);
   UI.rebuild();
   UI.hotbar();
   persist();
@@ -2071,7 +2077,7 @@ function drawPot(g, o) {
 // ふさがった 道の まわりの、こい ネオンスポアの きり
 function drawGateFog(g, m, x0, y0, x1, y1) {
   for (const o of m.objs) {
-    if (o.t !== 'gate' || o.x < x0 - 2 || o.x > x1 + 2 || o.y < y0 - 2 || o.y > y1 + 2) continue;
+    if (o.t !== 'gate' || !o.road || o.x < x0 - 2 || o.x > x1 + 2 || o.y < y0 - 2 || o.y > y1 + 2) continue;
     for (let k = 0; k < 7; k++) {
       const h = hash2(o.x * 7 + k, o.y * 5 + k);
       const ph = (G.time * (0.15 + h * 0.2) + h * 5) % 1;
