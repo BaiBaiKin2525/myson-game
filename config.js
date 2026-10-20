@@ -195,3 +195,23 @@ const MILESTONES = {
   9: { give: 'part:arm', lines: ['{n}を {入|い}れたら… ゴゴゴ… ポン！', 'パーツ「ギシギシ アーム」が できた！', 'ウィーン… うでに つけた。おもい いしも どかせる ように なった！'] },
   10: { give: 'clean', lines: ['ぜんぶ かたづいた！', 'けんきゅう{室|しつ}が すっきり した。はかせも きっと よろこぶね。'] },
 };
+
+// ---------- 町の 地図（DESIGN.md「全体マップ」） ----------
+// 水ろが せぼね：上流は 鉱山、下流は 海。col／row は 地図の 画面での ばしょ（col 0 が 水ろの ならび）
+// built：もう マップが ある。ch：その しょうから 行ける
+const AREAS = {
+  mine:    { name: 'ネオン こうざん',             col: 0, row: 0, ch: 4, built: false, note: 'じょうりゅう。{水|みず}ろが わき{出|で}す {山|やま}' },
+  station: { name: 'スカイステーション',          col: 1, row: 0, ch: 5, built: false, note: '{町|まち}の いちばん {北|きた}' },
+  plaza:   { name: 'ちゅうおう {広場|ひろば}',     col: 0, row: 1, ch: 3, built: true,  note: '{空気|くうき}じょうか ツリー・かじゅえん（4しょう）' },
+  shop:    { name: 'ネオン しょう{店|てん}がい',   col: 1, row: 1, ch: 3, built: false, note: 'サイバーどうぶつの お{店|みせ}' },
+  out:     { name: 'けんきゅう{室|しつ} まわり',   col: 0, row: 2, ch: 1, built: true,  note: 'けんきゅう{室|しつ}・{水|みず}ろ・はたけ' },
+  sea:     { name: '{海|うみ}と みなと',           col: 0, row: 3, ch: 2, built: true,  note: 'かりゅう。しお{風|かぜ}で オイルが へりやすい' },
+};
+// ふさがった 道（がれきと ネオンスポアの きり）。to の エリアへの 道を ch しょうまで ふさぐ
+const GATES = {
+  toPlaza: { to: 'plaza', ch: 3 },
+  toSea:   { to: 'sea',   ch: 2 },
+  toShop:  { to: 'shop',  ch: 3 },
+  toMine:  { to: 'mine',  ch: 4 },
+};
+const SEA_OIL = 2; // 海では しお風で バリアオイルの へりが 2ばい

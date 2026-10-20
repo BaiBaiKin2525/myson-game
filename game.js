@@ -65,10 +65,11 @@ function startGame(p) {
   G.pid = p.id;
   G.profile = p;
   G.save = loadSave(p.id) || newSave();
-  G.maps = { house: buildHouse(G.save), out: buildOutside(G.save) };
-  for (const mm of Object.values(G.maps)) bakeGround(mm);
+  G.maps = { house: buildHouse(G.save) };
+  bakeGround(G.maps.house);
+  ensureMap('out');
   const pos = G.save.pos;
-  const m = G.maps[pos.map] ? pos.map : 'house';
+  const m = ensureMap(pos.map) ? pos.map : 'house';
   if (walkable(G.maps[m], pos.x, pos.y)) setMap(m, pos.x, pos.y, pos.dir);
   else setMap('house', 5, 3, 'up');
   $('title').classList.add('hidden');
@@ -157,6 +158,23 @@ function wakeUp(added) {
   }, 1700);
 }
 
+// エリアの マップ（まだ なければ つくって じめんを やく）。つくれない ときは null
+function ensureMap(id) {
+  if (G.maps[id]) return G.maps[id];
+  const build = AREA_BUILD[id];
+  if (!build) return null;
+  G.maps[id] = build(G.save);
+  bakeGround(G.maps[id]);
+  return G.maps[id];
+}
+
+// ふさがった 道が ひらいた とき などに、そとの エリアを つくりなおす
+function rebuildAreas() {
+  for (const id of Object.keys(AREA_BUILD)) delete G.maps[id];
+  ensureMap('out');
+  if (G.map && AREA_BUILD[G.map.id]) G.map = ensureMap(G.map.id);
+}
+
 function setMap(id, x, y, dir) {
   G.map = G.maps[id];
   G.p = { x, y, tx: x, ty: y, moving: false, t: 0, dir: dir || 'down', hold: 0, chain: false };
@@ -213,7 +231,7 @@ function oilSpeed() {
 function useOil(n) {
   const s = G.save;
   const before = s.oil;
-  s.oil = Math.max(0, s.oil - n);
+  s.oil = Math.max(0, s.oil - n * ((G.map && G.map.oilMul) || 1));
   if (before >= 25 && s.oil < 25) UI.toast('ギシギシ… バリアオイル🛢が へって、{体|からだ}に ネオンスポアが くっついて きた…', 2800);
   UI.hud();
 }
@@ -346,6 +364,7 @@ function setupInput() {
   // もちもの・メニューは ロボが とまっていても ひらける（さんすうアプリへ もどれる ように）
   $('bagBtn').onclick = () => { Sfx.init(); if (canOpen()) openBag(); };
   $('menuBtn').onclick = () => { Sfx.init(); if (canOpen()) openMenu(); };
+  $('mapBtn').onclick = () => { Sfx.init(); if (canControl()) openMap(); };
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) persist();
@@ -452,11 +471,21 @@ function partFx(fx, part) {
   return list[Math.min(list.length - 1, G.save.parts[part] || 0)];
 }
 
+// x0〜x1（よこに ならんだ 端）・y0〜y1（たてに ならんだ 端）・x,y（ひとつの マス）の ドア。つく ばしょ（tx,ty）を きめて かえす
+function doorAt(m, x, y) {
+  for (const d of m.doors) {
+    if (d.x0 != null && y === d.y && x >= d.x0 && x <= d.x1) return { ...d, tx: x };
+    if (d.y0 != null && x === d.x && y >= d.y0 && y <= d.y1) return { ...d, ty: y };
+    if (d.x0 == null && d.y0 == null && d.x === x && d.y === y) return d;
+  }
+  return null;
+}
+
 function tryStep(d) {
   const p = G.p;
   const [dx, dy] = DIRV[d];
   const nx = p.x + dx, ny = p.y + dy;
-  const door = G.map.doors.find((o) => o.x === nx && o.y === ny);
+  const door = doorAt(G.map, nx, ny);
   if (door && !canUseDoor(door)) {
     p.chain = false;
     p.hold = -0.6;
@@ -482,12 +511,17 @@ function canUseDoor(door) {
     UI.say('もっている ものを ごうせい そうちに {入|い}れてから でかけよう。');
     return false;
   }
+  if (!AREA_BUILD[door.to] && door.to !== 'house' && door.to !== 'out') {
+    const a = AREAS[door.to];
+    UI.say(`この さきは「${a ? a.name : '？？？'}」。\nまだ つくって いる ところ だよ。（${a ? a.ch : '？'}しょうで {行|い}ける よてい）`);
+    return false;
+  }
   return true;
 }
 
 function arrived() {
   const p = G.p;
-  const door = G.map.doors.find((o) => o.x === p.x && o.y === p.y);
+  const door = doorAt(G.map, p.x, p.y);
   if (door) goThrough(door);
 }
 
@@ -496,19 +530,42 @@ function fadeTo(v, cb, ms = 260) {
   setTimeout(cb, ms);
 }
 
+// つく マスが とおれない ときは ちかくの とおれる マスへ（エリアの 端で 道が すこし ずれて いても だいじょうぶ）
+function landing(m, x, y) {
+  let best = null, bestScore = 1e9;
+  for (let dy = -4; dy <= 4; dy++) {
+    for (let dx = -4; dx <= 4; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (!walkable(m, nx, ny) || doorAt(m, nx, ny)) continue;
+      const road = [TL.PATH, TL.PAVE, TL.PIER].includes(tileAt(m, nx, ny));
+      const score = Math.hypot(dx, dy) + (road ? 0 : 1.5); // 道の うえを えらぶ
+      if (score < bestScore) { bestScore = score; best = [nx, ny]; }
+    }
+  }
+  return best || [x, y];
+}
+
 function goThrough(door) {
   G.busy = true;
   Sfx.play('door');
   fadeTo(1, () => {
-    setMap(door.to, door.tx, door.ty, door.dir);
+    const m = ensureMap(door.to);
+    const [lx, ly] = landing(m, door.tx, door.ty);
+    setMap(door.to, lx, ly, door.dir);
+    const s = G.save;
+    s.visited = s.visited || {};
+    const first = !s.visited[door.to];
+    s.visited[door.to] = true;
     persist();
     fadeTo(0, () => {
       G.busy = false;
+      if (first && AREA_INTRO[door.to]) UI.say(AREA_INTRO[door.to]);
       if (door.to === 'out' && !G.save.flags.outIntro) {
         G.save.flags.outIntro = true;
         persist();
         UI.say([
           '{外|そと}に {出|で}た！ {青|あお}い ネオンスポアが ふわふわ とんで いる…',
+          '🗺 ボタンで {町|まち}の {地図|ちず}を {見|み}られるよ。',
           'みぎの ほうに {水|みず}ろが ある。でも {水|みず}が むらさきに {光|ひか}って いる…',
           '{水|みず}の {前|まえ}で つりざおを えらんで Ⓐ！ どんな さかなが いるかな？',
           'けんきゅう{室|しつ}の まわりに、{黄|き}いろい オイル{草|くさ}が さいて いる。',
@@ -518,6 +575,20 @@ function goThrough(door) {
     });
   });
 }
+
+// はじめて エリアに 入った ときの ことば
+const AREA_INTRO = {
+  plaza: [
+    'ちゅうおう {広場|ひろば}に ついた！',
+    'まんなかに {大|おお}きな きかいの {木|き}が ある… かれて うごいて いない。',
+    '{北|きた}の {道|みち}は ネオン こうざんへ、ひがしの はしの さきは ネオン しょう{店|てん}がいへ つづいて いる。',
+  ],
+  sea: [
+    '{海|うみ}だ！ みなとに ついた！',
+    'しお{風|かぜ}が つよい… バリアオイル🛢が いつもより はやく へるよ。',
+    'ていぼう（{海|うみ}に つきでた コンクリートの {道|みち}）の さきから なら つりが できそう。',
+  ],
+};
 
 // ---------- しらべる・つかう ----------
 
@@ -611,9 +682,23 @@ const ACT = {
       deadTree: ['かれた {木|き}。ネオンスポアで よわって しまった みたい…', 'みきに {光|ひか}る コケが はえて いる。'],
       barrel: ['さびた ドラムかん。{中|なか}は からっぽ。'],
       lamp: ['こわれた がいとう。100{年|ねん} {明|あ}かりが ついて いない…'],
+      bench: ['こわれた ベンチ。むかしは ここで {人間|にんげん}が ひとやすみ して いたんだね。'],
+      crate: ['さびた コンテナ。{中|なか}は からっぽ…'],
     }[o.t] || ['…'];
     UI.say(pickOne(lines));
   },
+  gate(o) {
+    const g = GATES[o.gid], a = AREAS[g.to];
+    UI.say([`がれきと ネオンスポアの きりで {道|みち}が ふさがって いる…`, `この さきは「${a.name}」。${g.ch}しょうで {通|とお}れる ように なるよ。`]);
+  },
+  airTree() {
+    UI.say(['{空気|くうき}じょうか ツリー。ネオンスポアを すいこんで {空気|くうき}を きれいに する きかいの {木|き}。', 'いまは かれて、うごいて いない…（4しょうで うごかすよ）']);
+  },
+  orchard() { UI.say('かれた {木|き}の きりかぶ。むかしは ここに くだものの {木|き}が あったみたい。'); },
+  signOrchard() { UI.say('「かじゅえん」\nくだものの {木|き}を そだてる ところ。（4しょうで つかえるよ）'); },
+  signPlaza() { UI.say('「ちゅうおう {広場|ひろば}」\n{北|きた}：ネオン こうざん　ひがし：ネオン しょう{店|てん}がい　{南|みなみ}：けんきゅう{室|しつ}'); },
+  boat(o) { UI.say(['こわれた ボート。そこに あなが あいて いる…', '3しょうの メカ{工|こう}ぼうで {直|なお}して もらえる かも。{直|なお}すと {海|うみ}の おきで つりが できるよ！']); },
+  signPier() { UI.say('「ていぼう」\nここから {海|うみ}に むかって つりざおを つかおう。'); },
   signFarm() { UI.say('「はたけ」\nいまは ネオンスポアが こくて、はたけに できない…\n（2しょうで ひらくよ。いまは けんきゅう{室|しつ}の プランターで そだてよう）'); },
   signCanal() { UI.say('「{水|みず}ろ」\n{水|みず}の {前|まえ}で つりざおを つかおう。\nうきが ツンツン した あと、スパッと しずんだら Ⓐ！'); },
 };
@@ -1201,6 +1286,11 @@ function startFishing(tx, ty) {
     UI.toast('みずの まえで つりざおを つかおう');
     return;
   }
+  if (G.map.id === 'sea' && tileAt(G.map, G.p.x, G.p.y) !== TL.PIER && !G.save.tools.boat) {
+    Sfx.play('err');
+    UI.toast('ここからは つれない… ていぼうの {上|うえ}から つろう');
+    return;
+  }
   if (!spend(CFG.cost.cast)) return;
   Sfx.play('cast');
   const pick = pickFish();
@@ -1227,7 +1317,7 @@ function startFishing(tx, ty) {
 function pickFish() {
   const tier = G.save.tools.rod;
   const pool = [];
-  if (G.maps.out && G.maps.out.glow) {
+  if (G.map && G.map.glow) {
     // よごれた 水ろ：ネオンスポアで 光る すがたの さかな だけ
     for (const k of Object.keys(GLOW)) pool.push({ id: `g_${k}`, w: FISH[k].w, spec: FISH[k] });
   } else {
@@ -1435,6 +1525,44 @@ function openBag() {
   });
 }
 
+// ---------- 町の 地図 ----------
+
+function openMap() {
+  Sfx.play('ui');
+  UI.panel('{町|まち}の {地図|ちず}', (box) => {
+    const s = G.save;
+    const here = G.map.id === 'house' ? 'out' : G.map.id;
+    box.appendChild(el('p', 'help', '{水|みず}ろが じょうりゅうの こうざん から、かりゅうの {海|うみ}へ ながれて いるよ。'));
+    const grid = el('div', 'tmap');
+    const rows = Math.max(...Object.values(AREAS).map((a) => a.row)) + 1;
+    grid.style.gridTemplateRows = `repeat(${rows}, auto)`;
+    grid.appendChild(el('div', 'river'));
+    for (const [id, a] of Object.entries(AREAS)) {
+      const open = (s.flags.allOpen || (s.ch || 1) >= a.ch) && a.built;
+      const visited = (s.visited || {})[id] || id === 'out';
+      const cls = id === here ? 'here' : open ? (visited ? 'ok' : 'new') : 'lock';
+      const status = id === here ? `🤖 ${escHTML(s.name || 'ロビタ')}が いる` : open ? (visited ? '{行|い}ける' : '{行|い}ける（まだ {行|い}って いない）') : `🔒 ${a.ch}しょうで {行|い}ける`;
+      const c = el('div', `tcell ${cls}`, `<div class="nm">${a.name}</div><div class="ds">${status}</div><div class="ds sm">${a.note}</div>`);
+      c.style.gridColumn = String(a.col + 1);
+      c.style.gridRow = String(a.row + 1);
+      // おとなの テスト：たっぷして その エリアへ
+      if (G.dev && a.built && id !== here) {
+        c.onclick = () => {
+          UI.closePanel();
+          const m = ensureMap(id);
+          const d = m.doors.find((x) => x.x0 != null) || { x0: 20, y: 14 };
+          const [lx, ly] = landing(m, d.x0, d.y === 0 ? 1 : d.y === m.h - 1 ? m.h - 2 : d.y);
+          setMap(id, lx, ly, 'down');
+          (s.visited = s.visited || {})[id] = true;
+          persist();
+        };
+      }
+      grid.appendChild(c);
+    }
+    box.appendChild(grid);
+  });
+}
+
 // ---------- メニュー ----------
 
 function openMenu() {
@@ -1459,6 +1587,12 @@ function openMenu() {
       add('⚡ かみなりで でんちを 50 とどける（じつりょくテストの かわり）', () => { grantGameStamina(G.pid, 50, 'テスト'); UI.closePanel(); checkGrants(); });
       add('🔩 ねじ +3・てつくず +8', () => { addItem('m_screw', 3); addItem('m_scrap', 8); persist(); UI.rebuild(); });
       add('🛢 オイル 100', () => { s.oil = 100; UI.hud(); persist(); UI.rebuild(); });
+      add(s.flags.allOpen ? '🔓 ふさがった みち：ぜんぶ ひらいて いる' : '🔒 ふさがった みちを ぜんぶ ひらく（テスト）', () => {
+        s.flags.allOpen = !s.flags.allOpen;
+        rebuildAreas();
+        persist();
+        UI.rebuild();
+      });
       add('🔧 1しょうの きかいを ぜんぶ なおす', () => {
         for (const c of CH1) { s.fixed[c.id] = true; if (!s.videos.includes(c.video)) s.videos.push(c.video); }
         s.flags.oiled = true;
@@ -1506,6 +1640,7 @@ const SHADOW = {
   clutter: [12, 3], reed: [6, 2], table: [28, 4], synth: [30, 3], press: [28, 3], charger: [30, 3], bed: [30, 3], wild: [8, 2], scrap: [12, 3],
   pod: [30, 4], pot: [14, 3], filter: [30, 5],
   deadTree: [12, 3], car: [30, 4], wall: [30, 3], barrel: [9, 3], rubble: [14, 3],
+  gate: [14, 3], airTree: [44, 6], bench: [14, 3], boat: [30, 4], stump: [12, 3], crate: [12, 3],
 };
 
 function resize() {
@@ -1615,6 +1750,7 @@ function render() {
     else drawSpr(g, SP[o.spr], o);
   }
   drawSpores(g, m, cx, cy, vw, vh);
+  drawGateFog(g, m, x0, y0, x1, y1);
 
   if (G.fishing) drawFishing(g, ppx, ppy);
   if (canControl() && !p.moving && G.save.flags.intro) drawCursor(g);
@@ -1672,6 +1808,24 @@ function drawPot(g, o) {
   if (st === 3 && Math.sin(G.time * 5 + o.x) > 0.3) {
     R(g, '#fff6a0', o.x * T + 27, o.y * T - 16, 1, 5);
     R(g, '#fff6a0', o.x * T + 25, o.y * T - 14, 5, 1);
+  }
+}
+
+// ふさがった 道の まわりの、こい ネオンスポアの きり
+function drawGateFog(g, m, x0, y0, x1, y1) {
+  for (const o of m.objs) {
+    if (o.t !== 'gate' || o.x < x0 - 2 || o.x > x1 + 2 || o.y < y0 - 2 || o.y > y1 + 2) continue;
+    for (let k = 0; k < 7; k++) {
+      const h = hash2(o.x * 7 + k, o.y * 5 + k);
+      const ph = (G.time * (0.15 + h * 0.2) + h * 5) % 1;
+      const x = o.x * T + 16 + Math.sin(G.time * 0.8 + k * 1.7 + o.x) * 18;
+      const y = o.y * T + 20 - ph * 34;
+      const a = 0.32 * Math.sin(ph * Math.PI);
+      g.fillStyle = k % 2 ? `rgba(150,90,230,${a})` : `rgba(90,220,240,${a * 0.8})`;
+      g.beginPath();
+      g.arc(x, y, 9 + h * 10, 0, Math.PI * 2);
+      g.fill();
+    }
   }
 }
 

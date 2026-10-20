@@ -1,7 +1,7 @@
 'use strict';
 // マップ：100年 だれも いない けんきゅう室（なか）と そと（ネオンスポアで よごれた 水ろ・あれた はたけ）
 
-const TL = { GRASS: 0, PATH: 1, WATER: 2, SAND: 3, FLOOR: 4, WALL: 5, FACE: 6 };
+const TL = { GRASS: 0, PATH: 1, WATER: 2, SAND: 3, FLOOR: 4, WALL: 5, FACE: 6, PAVE: 7, PIER: 8 }; // PAVE：いしだたみ・コンクリート、PIER：ていぼう・はし（水の うえを あるける）
 const FARM = { x0: 4, y0: 12, x1: 13, y1: 21 }; // たがやせる ところ
 const inFarm = (x, y) => x >= FARM.x0 && x <= FARM.x1 && y >= FARM.y0 && y <= FARM.y1;
 
@@ -115,7 +115,11 @@ function buildHouse(save) {
   return m;
 }
 
-// ---------- そと（40×28） ----------
+// ---------- そとの エリア（どれも 40×28）：水ろが きれずに つながる ----------
+// 水ろは 北（上流：鉱山）から 南（下流：海）へ ながれる。エリアの 端で 水ろと 川ぞいの 道の ばしょが そろう ように する。
+// 川ぞいの 道は 水の 2マス 西（水ろの まんなか − 4 〜 − 3）。端の 1れつに 立つと となりの エリアへ（m.doors の x0〜x1）
+
+const AW = 40, AH = 28;
 
 // そとの オイル草が さいている か
 const wildReady = (save, id) => {
@@ -126,74 +130,180 @@ const wildReady = (save, id) => {
 // おなじ えが ならばない ように いろちがい・はんてんを えらぶ
 const variant = (spr, r) => (spr === 'car' ? ['car', 'car2', 'carB'][(r() * 3) | 0] : spr === 'wallBroken' ? (r() < 0.5 ? 'wallBroken' : 'wall2') : spr);
 
-// 水ろの まんなか（y ごとに すこし まがる）
-const canalX = (y) => 32 + Math.round(Math.sin(y * 0.3) * 2);
+// 水ろの まんなか（y ごとに すこし まがる）。エリアの 端どうしで おなじ x に なる
+const canalX = (y) => 32 + Math.round(Math.sin(y * 0.3) * 2);              // けんきゅう室まわり：上 32 → 下 34
+const plazaCanalX = (y) => 32 + Math.round(Math.sin((AH - 1 - y) * 0.3) * 2); // ちゅうおう広場：下の 端で 32
+const seaCanalX = (y) => 34 + Math.round(Math.sin(y * 0.35) * 1.5);         // 海：上の 端で 34
+const roadX = (cx) => cx - 4;                                              // 川ぞいの 道の ひだりの マス
 
-function buildOutside(save) {
-  const W = 40, H = 28;
-  const m = newMap('out', W, H);
-  m.name = 'そと';
-  m.glow = !save.flags.cleanWater; // ネオンスポアで よごれて 光って いる（2しょうで きれいに なる）
-  m.ruin = !save.flags.airClean;   // 100年 だれも いない あれた 町（4しょうの 空気じょうか ツリーで みどりが もどる よてい）
-  const r = RNG(2024);
-  for (let i = 0; i < W * H; i++) m.v[i] = (r() * 4) | 0;
-
-  // 水ろ（きたから みなみへ ながれる）と すなの きし
-  const water = (x, y) => y >= 1 && y <= H - 2 && Math.abs(x - canalX(y)) <= 1;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (water(x, y)) setTile(m, x, y, TL.WATER);
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (m.tiles[y * W + x] === TL.WATER) continue;
+// 水ろ・すなの きし・川ぞいの 道を つくる（水ろは y0〜y1、道は y0〜roadY1）
+function layCanal(m, cxf, y0, y1, roadY1 = y1) {
+  const water = (x, y) => y >= y0 && y <= y1 && Math.abs(x - cxf(y)) <= 1;
+  for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (water(x, y)) setTile(m, x, y, TL.WATER);
+  for (let y = 0; y < m.h; y++) {
+    for (let x = 0; x < m.w; x++) {
+      if (m.tiles[y * m.w + x] === TL.WATER) continue;
       let near = false;
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (water(x + dx, y + dy)) near = true;
       if (near) setTile(m, x, y, TL.SAND);
     }
   }
+  for (let y = y0; y <= roadY1; y++) {
+    const rx = roadX(cxf(y));
+    for (const x of [rx, rx + 1]) setTile(m, x, y, TL.PATH);
+    // まがりかどで 道が とぎれない ように
+    if (y > y0) {
+      const px = roadX(cxf(y - 1));
+      for (let x = Math.min(px, rx); x <= Math.max(px, rx) + 1; x++) setTile(m, x, y, TL.PATH);
+    }
+  }
+}
 
+// まわりの 2マスを とおれなく する（道は のこす）
+function ringWall(m) {
+  for (let y = 0; y < m.h; y++) {
+    for (let x = 0; x < m.w; x++) {
+      if (!(x < 2 || y < 2 || x >= m.w - 2 || y >= m.h - 2)) continue;
+      if (m.tiles[y * m.w + x] === TL.PATH || m.tiles[y * m.w + x] === TL.PAVE) continue;
+      m.tsolid[y * m.w + x] = 1;
+      refreshCell(m, y * m.w + x);
+    }
+  }
+}
+
+// まわりの あれた 町なみ（くずれた ビル・かべ・はいしゃ・かれ木）。sides：'n' 'e' 's' 'w' の どこに おくか
+function ringRuins(m, seed, sides = 'nesw') {
+  const W = m.w, H = m.h;
+  const er = RNG(seed);
+  const dry = (x0, x1, y) => {
+    for (let x = x0; x <= x1; x++) {
+      const t = tileAt(m, x, y);
+      if (t === TL.WATER || t === TL.SAND || t === TL.PATH || t === TL.PAVE || t === TL.PIER || t === -1 || objAt(m, x, y)) return false;
+    }
+    return true;
+  };
+  if (sides.includes('n')) {
+    for (let x = 0; x < W;) {
+      const tall = er() < 0.6;
+      const w = tall ? 3 : 2;
+      if (!dry(x, x + w - 1, 1) || !dry(x, x + w - 1, 0)) { x++; continue; }
+      addObj(m, { t: 'ruinB', spr: tall ? `tower${1 + ((er() * 3) | 0)}` : `shop${1 + ((er() * 2) | 0)}`, x, y: 1, w, h: 1, act: 'look' });
+      x += w + (er() < 0.25 ? 1 : 0);
+    }
+  }
+  if (sides.includes('s')) {
+    for (let x = 0; x < W;) {
+      const k = er();
+      const spr = k < 0.35 ? 'wallBroken' : k < 0.55 ? 'car' : k < 0.8 ? 'rubbleBig' : 'deadTree';
+      const w = spr === 'deadTree' ? 1 : 2;
+      if (!dry(x, x + w - 1, H - 2)) { x++; continue; }
+      addObj(m, { t: { wallBroken: 'wall', car: 'car', rubbleBig: 'rubble', deadTree: 'deadTree' }[spr], spr: variant(spr, er), x, y: H - 2, w, h: 1, act: 'look' });
+      x += w + (er() < 0.4 ? 1 : 0);
+    }
+  }
+  for (const [side, x] of [['w', 0], ['e', W - 2]]) {
+    if (!sides.includes(side)) continue;
+    for (let y = 3; y < H - 3;) {
+      const k = er();
+      if (k < 0.4 && dry(x, x + 1, y)) { addObj(m, { t: 'ruinB', spr: `shop${1 + ((er() * 2) | 0)}`, x, y, w: 2, h: 1, act: 'look' }); y += 3; continue; }
+      const spr = k < 0.6 ? 'deadTree' : k < 0.85 ? 'rubble' : 'barrel';
+      const xx = x + (er() < 0.5 ? 0 : 1);
+      if (dry(xx, xx, y)) addObj(m, { t: spr, spr, x: xx, y, act: 'look' });
+      y += 2;
+    }
+  }
+}
+
+// エリアの なかに ちらばる がれき・かれ木・はいしゃ と、じめんの ごみ
+function scatterRuins(m, seed, n, busy) {
+  const W = m.w, H = m.h;
+  const tr = RNG(seed);
+  let put = 0;
+  for (let k = 0; k < n * 20 && put < n; k++) {
+    const x = 2 + ((tr() * (W - 4)) | 0);
+    const y = 2 + ((tr() * (H - 4)) | 0);
+    if (busy(x, y)) continue;
+    const kind = tr();
+    if (m.ruin) {
+      const spr = kind < 0.28 ? 'deadTree' : kind < 0.5 ? 'rubble' : kind < 0.62 ? 'car' : kind < 0.76 ? 'barrel' : kind < 0.88 ? 'wallBroken' : kind < 0.95 ? 'rubbleBig' : 'bush2';
+      const w = ['car', 'wallBroken', 'rubbleBig'].includes(spr) ? 2 : 1;
+      if (w === 2 && busy(x + 1, y)) continue;
+      const t = { deadTree: 'deadTree', rubble: 'rubble', rubbleBig: 'rubble', car: 'car', barrel: 'barrel', wallBroken: 'wall', bush2: 'bush' }[spr];
+      addObj(m, { t, spr: variant(spr, tr), x, y, w, h: 1, solid: true, act: t === 'bush' ? undefined : 'look' });
+    } else if (kind < 0.55) addObj(m, { t: 'tree', spr: kind < 0.15 ? 'pine' : kind < 0.35 ? 'tree' : 'tree2', x, y, solid: true });
+    else addObj(m, { t: 'bush', spr: kind < 0.8 ? 'bush' : 'bush2', x, y, solid: true });
+    put++;
+  }
+  for (let k = 0; k < 70; k++) {
+    const x = 2 + ((tr() * (W - 4)) | 0);
+    const y = 2 + ((tr() * (H - 4)) | 0);
+    const t = tileAt(m, x, y);
+    if (t === TL.WATER || t === TL.PIER || objAt(m, x, y) || (m.id === 'out' && inFarm(x, y))) continue;
+    const f = tr();
+    const spr = m.ruin ? (f < 0.9 ? (f < 0.45 ? 'debris' : 'debris2') : f < 0.95 ? 'flowerA' : 'flowerB') : f < 0.5 ? 'flowerA' : 'flowerB';
+    if (spr.startsWith('flower') && t !== TL.GRASS) continue;
+    addObj(m, { t: 'deco', spr, x, y, flat: true });
+  }
+}
+
+// ふさがった 道（がれきの バリケード と ネオンスポアの きり）。しょうが すすむと なくなる
+const gateOpen = (save, id) => !!(save.flags && save.flags.allOpen) || (save.ch || 1) >= GATES[id].ch;
+function addGate(m, save, id, cells) {
+  if (gateOpen(save, id)) return;
+  for (const [x, y] of cells) addObj(m, { t: 'gate', spr: (x + y) % 2 ? 'barricade' : 'barricade2', x, y, solid: true, act: 'gate', gid: id });
+}
+// その れつ（ぎょう）の 道を ぜんぶ ふさぐ（まがりかどで すきまが できない ように）
+const roadCells = (m, xs, ys) => {
+  const out = [];
+  for (const y of ys) for (const x of xs) if ([TL.PATH, TL.PAVE, TL.PIER].includes(tileAt(m, x, y))) out.push([x, y]);
+  return out;
+};
+const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+
+// まわりに ある もの が ない か（き・がれきを おく ときに よける）
+function busyFn(m, extra) {
+  return (x, y) => {
+    if (x < 3 || y < 3 || x > m.w - 4 || y > m.h - 4) return true;
+    if (extra && extra(x, y)) return true;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const t = tileAt(m, x + dx, y + dy);
+      if (t === TL.WATER || t === TL.SAND || t === TL.PATH || t === TL.PAVE || t === TL.PIER) return true;
+    }
+    return !!objAt(m, x, y);
+  };
+}
+
+function newArea(id, save) {
+  const m = newMap(id, AW, AH);
+  m.name = AREAS[id].name;
+  m.ruin = !save.flags.airClean; // 100年 だれも いない あれた 町（4しょうの 空気じょうか ツリーで みどりが もどる よてい）
+  const r = RNG(id.length * 977 + 2024);
+  for (let i = 0; i < AW * AH; i++) m.v[i] = (r() * 4) | 0;
+  return m;
+}
+
+// ---------- けんきゅう室 まわり（1〜2しょう） ----------
+
+function buildOutside(save) {
+  const W = AW, H = AH;
+  const m = newArea('out', save);
+  m.name = 'そと';
+  m.glow = !save.flags.cleanWater; // ネオンスポアで よごれて 光って いる（2しょうで きれいに なる）
+
+  layCanal(m, canalX, 0, H - 1);
   // みち
   const path = (x, y) => { if (m.tiles[y * W + x] === TL.GRASS) setTile(m, x, y, TL.PATH); };
   for (let x = 9; x <= 30; x++) path(x, 9);
   path(16, 8);
   for (let y = 10; y <= 11; y++) path(9, y);
   for (let x = 13; x <= 15; x++) path(x, 8);
+  ringWall(m);
 
-  // まわりは くずれた ビルと がれき（とおれない）
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (!(x < 2 || y < 2 || x >= W - 2 || y >= H - 2)) continue;
-      m.tsolid[y * W + x] = 1;
-      refreshCell(m, y * W + x);
-    }
-  }
-  const er = RNG(55);
-  const dry = (x0, x1, y) => { for (let x = x0; x <= x1; x++) if (tileAt(m, x, y) === TL.WATER || tileAt(m, x, y) === TL.SAND) return false; return true; };
-  // きた：ビルが ならぶ
-  for (let x = 0; x < W;) {
-    const tall = er() < 0.6;
-    const w = tall ? 3 : 2;
-    if (!dry(x, x + w - 1, 1) || !dry(x, x + w - 1, 0)) { x++; continue; }
-    addObj(m, { t: 'ruinB', spr: tall ? `tower${1 + ((er() * 3) | 0)}` : `shop${1 + ((er() * 2) | 0)}`, x, y: 1, w, h: 1, act: 'look' });
-    x += w + (er() < 0.25 ? 1 : 0);
-  }
-  // みなみ：くずれた かべ・はいしゃ・がれき
-  for (let x = 0; x < W;) {
-    const k = er();
-    const spr = k < 0.35 ? 'wallBroken' : k < 0.55 ? 'car' : k < 0.8 ? 'rubbleBig' : 'deadTree';
-    const w = spr === 'deadTree' ? 1 : 2;
-    if (!dry(x, x + w - 1, H - 2)) { x++; continue; }
-    addObj(m, { t: { wallBroken: 'wall', car: 'car', rubbleBig: 'rubble', deadTree: 'deadTree' }[spr], spr: variant(spr, er), x, y: H - 2, w, h: 1, act: 'look' });
-    x += w + (er() < 0.4 ? 1 : 0);
-  }
-  // にし と ひがし：ひくい ビル・かれ木・がれき・ドラムかん
-  for (const x of [0, W - 2]) {
-    for (let y = 3; y < H - 3;) {
-      const k = er();
-      if (k < 0.4 && dry(x, x + 1, y)) { addObj(m, { t: 'ruinB', spr: `shop${1 + ((er() * 2) | 0)}`, x, y, w: 2, h: 1, act: 'look' }); y += 3; continue; }
-      const spr = k < 0.6 ? 'deadTree' : k < 0.85 ? 'rubble' : 'barrel';
-      addObj(m, { t: spr === 'rubble' ? 'rubble' : spr, spr, x: x + (er() < 0.5 ? 0 : 1), y, act: 'look' });
-      y += 2;
-    }
-  }
+  // となりの エリアへ：きたは ちゅうおう広場、みなみは 海
+  m.doors.push({ x0: roadX(canalX(0)), x1: roadX(canalX(0)) + 1, y: 0, to: 'plaza', ty: AH - 2, dir: 'up' });
+  m.doors.push({ x0: roadX(canalX(H - 1)), x1: roadX(canalX(H - 1)) + 1, y: H - 1, to: 'sea', ty: 1, dir: 'down' });
+  addGate(m, save, 'toPlaza', roadCells(m, range(24, 32), [3]));
+  addGate(m, save, 'toSea', roadCells(m, range(24, 34), [H - 4]));
 
   // けんきゅう室（ドアの マスだけ とおれる）
   addObj(m, { t: 'house', spr: 'house', x: 14, y: 3, w: 6, h: 5, solid: true });
@@ -203,14 +313,14 @@ function buildOutside(save) {
   m.doors.push({ x: 16, y: 7, to: 'house', tx: 6, ty: 8, dir: 'up' });
 
   // 水ろの ろかそうち（こわれて いる。2しょうで なおす）
-  addObj(m, { t: 'filter', spr: 'filterBroken', x: 28, y: 5, w: 2, h: 2, solid: true, act: 'filter' });
+  addObj(m, { t: 'filter', spr: 'filterBroken', x: 27, y: 5, w: 2, h: 2, solid: true, act: 'filter' });
   // オイル草（とっても CFG.wildRegrow 日 たつと また さく）と、みちの こわれた きかい
   for (const w of WILD) addObj(m, { t: 'wild', spr: wildReady(save, w.id) ? 'wild' : 'wildPicked', x: w.x, y: w.y, solid: true, act: 'wild', wid: w.id });
   for (const sc of SCRAPS) {
-    if (!(save.picked || []).includes(sc.id)) addObj(m, { t: 'scrap', spr: 'c_machine', x: sc.x, y: sc.y, solid: true, act: 'scrap', sid: sc.id });
+    if (!(save.picked || []).includes(sc.id) && !objAt(m, sc.x, sc.y)) addObj(m, { t: 'scrap', spr: 'c_machine', x: sc.x, y: sc.y, solid: true, act: 'scrap', sid: sc.id });
   }
   addObj(m, { t: 'sign', spr: 'sign', x: 10, y: 10, solid: true, act: 'signFarm' });
-  addObj(m, { t: 'sign', spr: 'sign', x: 28, y: 10, solid: true, act: 'signCanal' });
+  addObj(m, { t: 'sign', spr: 'sign', x: 26, y: 11, solid: true, act: 'signCanal' });
 
   // はたけの さく（2しょうで ひらく。いまは くさぼうぼう）
   for (let x = FARM.x0 - 1; x <= FARM.x1 + 1; x++) {
@@ -247,47 +357,98 @@ function buildOutside(save) {
     addObj(m, { t: 'reed', spr: 'reed', x, y });
   }
 
-  // き・くさむら・はな
-  const busy = (x, y) => {
-    if (x < 3 || y < 3 || x > W - 4 || y > H - 4) return true;
-    if (x >= FARM.x0 - 2 && x <= FARM.x1 + 2 && y >= FARM.y0 - 2 && y <= FARM.y1 + 2) return true;
-    if (x >= 11 && x <= 25 && y >= 2 && y <= 11) return true;
-    if (x >= 26 && x <= 31 && y >= 3 && y <= 8) return true; // ろかそうち
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-      const t = tileAt(m, x + dx, y + dy);
-      if (t === TL.WATER || t === TL.SAND || t === TL.PATH) return true;
-    }
-    return !!objAt(m, x, y);
-  };
-  const tr = RNG(9);
-  // みちの こわれた がいとう
-  if (m.ruin) for (const [x, y] of [[22, 8], [27, 10], [12, 10], [18, 8]]) if (!objAt(m, x, y)) addObj(m, { t: 'lamp', spr: 'lampOff', x, y, solid: true, act: 'look' });
-  let trees = 0;
-  for (let k = 0; k < 500 && trees < (m.ruin ? 24 : 26); k++) {
-    const x = 2 + ((tr() * (W - 4)) | 0);
-    const y = 2 + ((tr() * (H - 4)) | 0);
-    if (busy(x, y)) continue;
-    const kind = tr();
-    if (m.ruin) {
-      // かれ木・がれき・はいしゃ・ドラムかん・くずれた かべ。みどりの 木は ほんの すこし
-      const spr = kind < 0.28 ? 'deadTree' : kind < 0.5 ? 'rubble' : kind < 0.62 ? 'car' : kind < 0.76 ? 'barrel' : kind < 0.88 ? 'wallBroken' : kind < 0.95 ? 'rubbleBig' : 'bush2';
-      const w = ['car', 'wallBroken', 'rubbleBig'].includes(spr) ? 2 : 1;
-      if (w === 2 && busy(x + 1, y)) continue;
-      const t = { deadTree: 'deadTree', rubble: 'rubble', rubbleBig: 'rubble', car: 'car', barrel: 'barrel', wallBroken: 'wall', bush2: 'bush' }[spr];
-      addObj(m, { t, spr: variant(spr, tr), x, y, w, h: 1, solid: true, act: t === 'bush' ? undefined : 'look' });
-    } else if (kind < 0.55) addObj(m, { t: 'tree', spr: kind < 0.15 ? 'pine' : kind < 0.35 ? 'tree' : 'tree2', x, y, solid: true });
-    else addObj(m, { t: 'bush', spr: kind < 0.8 ? 'bush' : 'bush2', x, y, solid: true });
-    trees++;
-  }
-  for (let k = 0; k < 70; k++) {
-    const x = 2 + ((tr() * (W - 4)) | 0);
-    const y = 2 + ((tr() * (H - 4)) | 0);
-    if (tileAt(m, x, y) === TL.WATER || objAt(m, x, y) || inFarm(x, y)) continue;
-    const f = tr();
-    // あれた 町は ごみが ちらばり、はなは ほんの すこし
-    const spr = m.ruin ? (f < 0.9 ? (f < 0.45 ? 'debris' : 'debris2') : f < 0.95 ? 'flowerA' : 'flowerB') : f < 0.5 ? 'flowerA' : 'flowerB';
-    if (spr.startsWith('flower') && tileAt(m, x, y) !== TL.GRASS) continue;
-    addObj(m, { t: 'deco', spr, x, y, flat: true });
-  }
+  ringRuins(m, 55);
+  if (m.ruin) for (const [x, y] of [[22, 8], [12, 10], [18, 8]]) if (!objAt(m, x, y)) addObj(m, { t: 'lamp', spr: 'lampOff', x, y, solid: true, act: 'look' });
+  scatterRuins(m, 9, m.ruin ? 24 : 26, busyFn(m, (x, y) =>
+    (x >= FARM.x0 - 2 && x <= FARM.x1 + 2 && y >= FARM.y0 - 2 && y <= FARM.y1 + 2) ||
+    (x >= 11 && x <= 25 && y >= 2 && y <= 11) || (x >= 25 && x <= 31 && y >= 3 && y <= 8)));
   return m;
 }
+
+// ---------- ちゅうおう広場（からっぽの かたち：4しょうで 空気じょうか ツリーと かじゅえん） ----------
+
+function buildPlaza(save) {
+  const W = AW, H = AH;
+  const m = newArea('plaza', save);
+  m.glow = !save.flags.airClean; // 上流は 4しょうまで よごれた まま
+  layCanal(m, plazaCanalX, 0, H - 1);
+
+  // まんなかの ひろば（石だたみ）と、川ぞいの 道からの みち
+  const cx = 15, cy = 13;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const d = Math.hypot((x - cx) / 1.25, y - cy);
+    if (d <= 6.2 && m.tiles[y * W + x] === TL.GRASS) setTile(m, x, y, TL.PAVE, false);
+  }
+  for (let x = cx + 5; x < roadX(plazaCanalX(cy)); x++) for (const y of [cy, cy + 1]) setTile(m, x, y, TL.PAVE, false);
+  // ひがしの しょう店がいへ：水ろを わたる はし と みち
+  for (const y of [cy, cy + 1]) {
+    for (let x = roadX(plazaCanalX(y)) + 2; x < W; x++) {
+      const t = m.tiles[y * W + x];
+      setTile(m, x, y, t === TL.WATER ? TL.PIER : TL.PAVE, false);
+    }
+  }
+  ringWall(m);
+  m.doors.push({ x0: roadX(plazaCanalX(H - 1)), x1: roadX(plazaCanalX(H - 1)) + 1, y: H - 1, to: 'out', ty: 1, dir: 'down' });
+  m.doors.push({ x0: roadX(plazaCanalX(0)), x1: roadX(plazaCanalX(0)) + 1, y: 0, to: 'mine', ty: AH - 2, dir: 'up' });
+  m.doors.push({ x: W - 1, y0: cy, y1: cy + 1, to: 'shop', tx: 1, dir: 'right' });
+  addGate(m, save, 'toMine', roadCells(m, range(22, 32), [3]));
+  addGate(m, save, 'toShop', roadCells(m, [W - 4], [cy, cy + 1]));
+
+  // かれた 空気じょうか ツリー（4しょうで うごかす）・こわれた ベンチ・からっぽの かじゅえん
+  addObj(m, { t: 'airTree', spr: 'airTreeDead', x: cx - 1, y: cy - 1, w: 3, h: 2, solid: true, act: 'airTree' });
+  for (const [x, y] of [[cx - 4, cy + 3], [cx + 3, cy + 3], [cx - 4, cy - 3], [cx + 3, cy - 3]]) addObj(m, { t: 'bench', spr: 'benchBroken', x, y, solid: true, act: 'look' });
+  for (let x = 4; x <= 10; x++) {
+    addObj(m, { t: 'fence', spr: 'fence', x, y: 4, solid: true });
+    addObj(m, { t: 'fence', spr: 'fence', x, y: 8, solid: true });
+  }
+  for (let y = 5; y <= 7; y++) {
+    addObj(m, { t: 'fence', spr: 'fenceV', x: 4, y, solid: true });
+    addObj(m, { t: 'fence', spr: 'fenceV', x: 10, y, solid: true });
+  }
+  for (const [x, y] of [[6, 6], [8, 6]]) addObj(m, { t: 'stump', spr: 'stump', x, y, solid: true, act: 'orchard' });
+  addObj(m, { t: 'sign', spr: 'sign', x: 11, y: 7, solid: true, act: 'signOrchard' });
+  addObj(m, { t: 'sign', spr: 'sign', x: roadX(plazaCanalX(20)) - 1, y: 20, solid: true, act: 'signPlaza' });
+
+  ringRuins(m, 66);
+  scatterRuins(m, 13, 18, busyFn(m, (x, y) => Math.hypot((x - cx) / 1.25, y - cy) < 8 || (x >= 3 && x <= 11 && y >= 3 && y <= 9)));
+  return m;
+}
+
+// ---------- 海と みなと（からっぽの かたち：2しょうで 行ける。ボートは 3しょう） ----------
+
+const seaShore = (x) => 15 + Math.round(Math.sin(x * 0.45) * 0.8); // この y から したが 海
+
+function buildSea(save) {
+  const W = AW, H = AH;
+  const m = newArea('sea', save);
+  m.glow = !save.flags.cleanWater;
+  m.oilMul = SEA_OIL; // しお風が つよい
+  // 海（したの ほう ぜんぶ）
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (y >= seaShore(x)) setTile(m, x, y, TL.WATER);
+  // 水ろは 海へ ながれこむ
+  layCanal(m, seaCanalX, 0, 15, 10);
+  // みなとの 岸ぺき（コンクリート）
+  for (let x = 2; x < W - 2; x++) for (let y = 11; y < seaShore(x); y++) if (m.tiles[y * W + x] !== TL.WATER) setTile(m, x, y, TL.PAVE, false);
+  // ていぼう：海に つきでた コンクリートの みち（ボートが ないうちは ここから だけ つれる）
+  for (let y = 12; y <= 22; y++) for (const x of [18, 19]) setTile(m, x, y, TL.PIER, false);
+  for (let x = 14; x <= 24; x++) for (const y of [22, 23]) setTile(m, x, y, TL.PIER, false);
+  // まわり：うえと よこは かべ、海は そのまま
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const t = m.tiles[y * W + x];
+      if (t === TL.WATER || t === TL.PIER || t === TL.PATH || t === TL.PAVE) continue;
+      if (x < 2 || y < 2 || x >= W - 2) { m.tsolid[y * W + x] = 1; refreshCell(m, y * W + x); }
+    }
+  }
+  m.doors.push({ x0: roadX(seaCanalX(0)), x1: roadX(seaCanalX(0)) + 1, y: 0, to: 'out', ty: AH - 2, dir: 'up' });
+
+  // こわれた ボート（3しょうの メカ工房で なおして もらう）・さびた コンテナ・とうだい
+  addObj(m, { t: 'boat', spr: 'boatBroken', x: 24, y: seaShore(24), w: 2, h: 1, solid: true, act: 'boat' });
+  for (const [x, y] of [[6, 12], [8, 12], [7, 11]]) addObj(m, { t: 'crate', spr: 'c_crate', x, y, solid: true, act: 'look' });
+  addObj(m, { t: 'sign', spr: 'sign', x: 17, y: 12, solid: true, act: 'signPier' });
+  ringRuins(m, 77, 'new');
+  scatterRuins(m, 21, 8, busyFn(m, (x, y) => y > 9));
+  return m;
+}
+
+const AREA_BUILD = { out: buildOutside, plaza: buildPlaza, sea: buildSea };

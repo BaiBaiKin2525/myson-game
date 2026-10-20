@@ -170,6 +170,9 @@ function bakeOutside(m, g) {
   const WA = (m.glow ? ['#1c1450', '#2a1f78', '#33309c', '#3a52b8', '#3f86d0', '#5fd8ea'] : ['#2a6aa6', '#3179b6', '#3b8ac4', '#4c9fd2', '#62b5df', '#7fcbe8']).map(hexRGB);
   const FOAM = hexRGB(m.glow ? '#d68aff' : '#c6eaf4'), WET = hexRGB(m.glow ? (m.ruin ? '#4a4656' : '#8f7a9a') : '#c2a46e'), EDGE = hexRGB(m.ruin ? '#66645e' : '#946a3e');
   const SEAM = hexRGB('#4a4844');
+  const PV = ['#4e4f53', '#58595d', '#626367', '#6c6d71'].map(hexRGB), PVS = hexRGB('#3a3b3f');
+  const PR = ['#6e6c66', '#7a7872', '#86847e'].map(hexRGB), PRE = hexRGB('#3e3c38');
+  const tileOf = (tx, ty) => (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h ? -1 : m.tiles[ty * m.w + tx]);
   const img = g.createImageData(W, H), a = img.data;
   for (let py = 0; py < H; py++) {
     for (let px = 0; px < W; px++) {
@@ -177,8 +180,18 @@ function bakeOutside(m, g) {
       const dth = BAYER[py & 3][px & 3] / 16 - 0.5;
       const nz = vnoise(x * 1.7, y * 1.7) - 0.5;
       const wv = samp(wM, x, y) + nz * 0.12;
+      const tx = (px / T) | 0, ty = (py / T) | 0, tt = m.tiles[ty * m.w + tx];
       let col;
-      if (wv > 0.5) {
+      if (tt === TL.PIER) {
+        // ていぼう・はし：コンクリートの いた。水に めんした ふちは くらい
+        const lx = px % T, ly = py % T;
+        col = (lx % 16 === 0 || ly % 16 === 0) ? PVS : pickTone(PR, fbm(x * 3, y * 3) + dth * 0.3 - 0.1);
+        if ((lx < 2 && tileOf(tx - 1, ty) === TL.WATER) || (lx > T - 3 && tileOf(tx + 1, ty) === TL.WATER) || (ly > T - 4 && tileOf(tx, ty + 1) === TL.WATER) || (ly < 2 && tileOf(tx, ty - 1) === TL.WATER)) col = PRE;
+      } else if (tt === TL.PAVE) {
+        // いしだたみ（ひろば・みなとの 岸ぺき）
+        const lx = (px + (ty % 2) * 8) % 16, ly = py % 16;
+        col = (lx === 0 || ly === 0) ? PVS : pickTone(PV, fbm(x * 2.5, y * 2.5) * 1.1 - 0.1 + dth * 0.3);
+      } else if (wv > 0.5) {
         const d = Math.min(1, (samp(dep, x, y) - 0.5) / 3.2);
         col = pickTone(WA, 1 - d + dth * 0.25 + (fbm(x * 2, y * 4) - 0.5) * 0.18);
         if (wv < 0.6 && (BAYER[py & 3][px & 3] > 5 || wv < 0.54)) col = FOAM;
@@ -2368,11 +2381,107 @@ function buildRuins() {
   }, '#2a2214');
 }
 
+// ---------- 町の エリア：ふさがった 道・ちゅうおう広場・みなと ----------
+
+function buildAreas() {
+  // バリケード（とおれない）。ネオンスポアが こびりついて 光る
+  SP.barricade = osp(32, 40, (g) => {
+    const r = RNG(41);
+    R(g, '#3a3a3e', 4, 18, 3, 20);
+    R(g, '#3a3a3e', 25, 18, 3, 20);
+    for (let x = 0; x < 32; x++) for (let y = 12; y < 22; y++) R(g, ((x + y) >> 2) % 2 ? '#d94c3d' : '#e8e2d6', x, y, 1, 1);
+    R(g, '#8a2a20', 0, 21, 32, 1);
+    R(g, '#ffd23f', 14, 6, 4, 4);
+    R(g, '#3a3a3e', 15, 10, 2, 2);
+    for (const [x, y] of [[2, 32], [10, 33], [18, 32], [26, 33], [6, 28], [22, 28]]) { E(g, '#7a6a4a', x + 2, y + 2, 4, 3); R(g, '#9a8a62', x, y, 4, 1); }
+    sporeMoss(g, r, 0, 12, 32, 26, 12);
+  }, '#121216');
+  SP.barricade2 = osp(32, 36, (g) => {
+    const r = RNG(43);
+    for (let i = 0; i < 9; i++) {
+      const cx = 4 + ((r() * 24) | 0), cy = 14 + ((r() * 18) | 0), rw = 3 + ((r() * 5) | 0), rh = 2 + ((r() * 4) | 0);
+      E(g, '#4a4b50', cx + 1, cy + 1, rw, rh);
+      E(g, r() < 0.5 ? '#6e6f74' : '#7e7f84', cx, cy, rw, rh);
+    }
+    for (let i = 0; i < 4; i++) { const bx = 6 + ((r() * 20) | 0); for (let k = 0; k < 10; k++) R(g, '#8a5a3a', bx + (k >> 2), 20 - k, 1, 1); }
+    for (const [x, y] of [[8, 10], [20, 8], [14, 14]]) { R(g, '#c08aff', x, y, 3, 5); R(g, '#7ff8ff', x + 1, y, 1, 3); } // ネオンスポアの けっしょう
+    sporeMoss(g, r, 2, 12, 28, 22, 14);
+  }, '#121216');
+
+  // かれた 空気じょうか ツリー（4しょうで うごかす）
+  SP.airTreeDead = osp(96, 116, (g) => {
+    const r = RNG(47);
+    R(g, '#3a3c42', 30, 100, 36, 16);
+    R(g, '#55575d', 30, 100, 36, 3);
+    R(g, '#4a4c52', 40, 40, 16, 62);
+    R(g, '#5e6066', 40, 40, 5, 62);
+    for (let y = 46; y < 100; y += 8) R(g, '#2e3036', 40, y, 16, 1);
+    E(g, '#1e2026', 48, 64, 6, 6);                  // とまった コア（光って いない）
+    E(g, '#2e3a44', 48, 64, 4, 4);
+    const arm = (x, y, dx, len) => {
+      let cx = x, cy = y;
+      for (let i = 0; i < len; i++) { R(g, '#4a4c52', Math.round(cx), Math.round(cy), 3, 3); cx += dx; cy -= 1.1; }
+      // こわれた ソーラーの は
+      for (let k = 0; k < 3; k++) {
+        const px = Math.round(cx) - 6 + k * 5, py = Math.round(cy) - 4 - (k % 2) * 3;
+        R(g, '#1a2a3a', px, py, 7, 5);
+        R(g, '#2c4054', px + 1, py + 1, 5, 1);
+        if (r() < 0.5) R(g, '#0e0f12', px + 2, py + 2, 3, 3);
+      }
+    };
+    arm(46, 44, -1.1, 24);
+    arm(50, 44, 1.1, 24);
+    arm(47, 40, -0.4, 26);
+    arm(49, 40, 0.5, 26);
+    arm(46, 56, -1.5, 16);
+    arm(50, 56, 1.5, 16);
+    for (let i = 0; i < 6; i++) { const x = 30 + ((r() * 36) | 0); for (let k = 0; k < 16; k++) R(g, '#1a1a1e', x + Math.round(Math.sin(k * 0.4) * 2), 100 - k, 1, 1); } // たれた ケーブル
+    sporeMoss(g, r, 30, 50, 36, 64, 26);
+  }, '#121216');
+
+  SP.benchBroken = osp(32, 24, (g) => {
+    R(g, '#5a4a3a', 2, 6, 28, 4);
+    R(g, '#6e5a46', 2, 6, 12, 4);
+    R(g, '#4a3a2e', 18, 9, 12, 3);                  // おれた いた
+    R(g, '#3a3a3e', 4, 10, 3, 12);
+    R(g, '#3a3a3e', 25, 12, 3, 10);
+    R(g, '#5a4a3a', 2, 14, 26, 3);
+    R(g, '#8a4a2a', 8, 15, 4, 1);
+  }, '#121216');
+
+  SP.stump = osp(30, 18, (g) => {
+    E(g, '#3a3028', 15, 12, 12, 5);
+    E(g, '#5e4a38', 15, 9, 11, 5);
+    E(g, '#7a6248', 15, 8, 8, 3);
+    E(g, '#5e4a38', 15, 8, 4, 1);
+    R(g, '#3f86a0', 6, 12, 2, 2);
+    R(g, '#7ff8ff', 6, 12, 1, 1);
+  }, '#1a1612');
+
+  // みなとの こわれた ボート（3しょうで なおして もらう）
+  SP.boatBroken = osp(64, 36, (g) => {
+    const r = RNG(53);
+    for (let y = 0; y < 14; y++) {
+      const inset = Math.round(y * 0.7);
+      R(g, y < 4 ? '#e8e2d6' : '#3a6a8a', 2 + inset, 18 + y, 60 - inset * 2, 1);
+    }
+    R(g, '#2a4a62', 4, 26, 56, 2);
+    R(g, '#1a1a1e', 30, 22, 8, 6);                  // あな
+    R(g, '#5a6a72', 18, 6, 22, 12);                 // キャビン
+    R(g, '#0e0f12', 21, 8, 7, 6);
+    R(g, '#0e0f12', 30, 8, 7, 6);
+    R(g, '#3a3a3e', 40, 0, 2, 18);                  // おれた マスト
+    for (let i = 0; i < 10; i++) R(g, r() < 0.5 ? '#a8582e' : '#7a3a20', 6 + ((r() * 52) | 0), 20 + ((r() * 10) | 0), 3, 1);
+    sporeMoss(g, r, 6, 20, 52, 10, 8);
+  }, '#121216');
+}
+
 function buildSprites() {
   buildNature();
   buildBuildings();
   buildCh1();
   buildRuins();
+  buildAreas();
   buildPlayer();
   buildCrops();
   buildIcons();
