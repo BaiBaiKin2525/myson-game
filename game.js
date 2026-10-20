@@ -1140,12 +1140,19 @@ function rollSynth(kind) {
   if (kind === 'machine') s.synthMiss = pick === 'm_screw' ? 0 : s.synthMiss + 1;
   if (!pick) return null;
   if (pick === 'seed') {
-    const k = pickOne((s.ch || 1) >= 2 ? [...SYNTH_SEEDS, ...SYNTH_SEEDS_CH2] : SYNTH_SEEDS);
-    s.seeds[k] = (s.seeds[k] || 0) + 1;
+    const k = giveRandomSeed();
     return { name: `${CROPS[k].name}の たね`, icon: `seed_${k}` };
   }
   addItem(pick);
   return { name: ITEMS[pick].name, icon: pick };
+}
+
+// たねを 1つ もちものに いれて、その しゅるいを かえす
+function giveRandomSeed() {
+  const s = G.save;
+  const k = pickOne((s.ch || 1) >= 2 ? [...SYNTH_SEEDS, ...SYNTH_SEEDS_CH2] : SYNTH_SEEDS);
+  s.seeds[k] = (s.seeds[k] || 0) + 1;
+  return k;
 }
 
 const gotLine = (got) => (got ? `ポン！「${got.name}」が {出|で}て きた！` : 'ぷしゅー… なにも {出|で}なかった');
@@ -1378,6 +1385,17 @@ function useItem(tx, ty, o) {
 
 // ---------- はたけ ----------
 
+// はたけしごとで たまに たねが でて くる。でた とき true
+function digSeed(kind, tx, ty, where) {
+  if (Math.random() >= DIG_SEED[kind]) return false;
+  const k = giveRandomSeed();
+  setTimeout(() => Sfx.play('pick'), 150);
+  addFx('たね！', '#fff07a', (tx + 0.5) * T, ty * T);
+  UI.toast(`${where}から、${CROPS[k].name}の たねが {出|で}て きた！`, 2600);
+  UI.hotbar();
+  return true;
+}
+
 function useHoe(tx, ty, o) {
   const s = G.save, m = G.map;
   if (o && o.t === 'weed') {
@@ -1385,6 +1403,7 @@ function useHoe(tx, ty, o) {
     removeObj(m, o);
     s.cleared.push(o.key);
     Sfx.play('cut');
+    digSeed('weed', tx, ty, 'くさの ねもと');
     persist();
     return;
   }
@@ -1399,7 +1418,7 @@ function useHoe(tx, ty, o) {
     s.cleared.push(o.key);
     addItem('stone');
     Sfx.play('till');
-    UI.toast('いしを どけた！（いしを 1こ てに いれた）');
+    if (!digSeed('rock', tx, ty, 'いしの {下|した}')) UI.toast('いしを どけた！（いしを 1こ てに いれた）');
     persist();
     return;
   }
@@ -1421,9 +1440,10 @@ function useHoe(tx, ty, o) {
   if (!spend(CFG.cost.hoe)) return;
   s.plots[key] = { w: 0, c: null };
   Sfx.play('till');
+  const seed = digSeed('till', tx, ty, 'つちの {中|なか}');
   if (!s.flags.firstTill) {
     s.flags.firstTill = true;
-    UI.toast('たがやした！ たねを えらんで まこう。{毎日|まいにち} じょうろで {水|みず}を あげよう', 2600);
+    if (!seed) UI.toast('たがやした！ たねを えらんで まこう。{毎日|まいにち} じょうろで {水|みず}を あげよう', 2600);
   }
   persist();
 }

@@ -130,6 +130,8 @@ const SYNTH = {
 };
 const SYNTH_SEEDS = ['nanohana', 'goma'];
 const SYNTH_SEEDS_CH2 = ['turnip', 'dcarrot', 'sunflower']; // 2しょう から ふえる たね
+// はたけで くさを かる・たがやす・いしを どけると、たまに たねが でる かくりつ（でる たねは ごうせい そうちと おなじ）
+const DIG_SEED = { weed: 0.2, till: 0.15, rock: 0.4 };
 const FISH_SCREW = 0.3; // さかなを いれると、のみこんで いた ねじが でる かくりつ（いつもの でる ものと べつに）
 const SCREW_PITY = 4;   // こわれた きかいを いれて ねじが でない ことが 4かい つづいたら、つぎは かならず でる
 
