@@ -1384,142 +1384,146 @@ const RC = {
   tread: '#2e3238', treadL: '#4a5058', hazard: '#ffd23f',
 };
 
-// dir：'down' 'up' 'side'（みぎむき）、f：0 とまる・1 2 あるく、parts：{ legs, arm, sensor }、on：めを さましている
-function robotSprite(dir, f, parts, on) {
+// ロビタの からだの いろ（3しょうの ペイント屋で かえる）。[ふつう, かげ, こい かげ, ひかり, アクセント]
+const ROBO_COLORS = {
+  ivory:  ['#ece2c8', '#cfc2a2', '#a3967a', '#faf5e6', '#7fd6b4'], // クラシック・アイボリー（はじめ）
+  mint:   ['#a8e2c8', '#7fc4a8', '#5a9a82', '#d4f6e6', '#f2ead4'],
+  orange: ['#f2a24a', '#d27f2e', '#a85e1a', '#ffd09a', '#f2ead4'],
+  blue:   ['#5a8ad8', '#3f6ab8', '#2a4a8a', '#9fc4ff', '#5ff6ff'],
+  gold:   ['#f2c94c', '#d2a62e', '#a87e1a', '#fff0a8', '#ffffff'],
+};
+
+// ロビタ：まるい ドームの からだ・くろい バイザーに まるい 2つの 目・みじかい 手足・あたまの アンテナ
+// dir：'down' 'up' 'side'（みぎむき）、f：0 とまる・1 2 あるく、parts：{ legs, arm, sensor }、on：目を さましている、color：ROBO_COLORS
+function robotSprite(dir, f, parts, on, color) {
+  const [cB, cS, cD, cL, cA] = ROBO_COLORS[color] || ROBO_COLORS.ivory;
   return osp(32, 48, (g) => {
+    const side = dir === 'side';
+    const sink = on ? 0 : 1;                      // とまっている ときは すこし しずむ
+    const bob = f ? 0 : 0;
     const lu = f === 1 ? 1 : 0, ru = f === 2 ? 1 : 0;
     const eye = on ? RC.eyeOn : RC.eyeOff;
-    const ball = on ? RC.pink : RC.pinkOff;
-    const side = dir === 'side';
-    const slump = on ? 0 : 1; // とまっている ときは あたまが すこし さがる
 
-    // あし
+    // あし（lv0：みじかい あしと まるい くつ、lv1：キャタピラ）
     if (parts.legs >= 1) {
       const xs = side ? [9] : [6, 18];
       for (const x of xs) {
         const w = side ? 15 : 8;
-        R(g, RC.tread, x, 38, w, 10);
-        R(g, RC.treadL, x, 38, w, 1);
-        for (let y = 40 + (f % 2); y < 47; y += 2) R(g, RC.treadL, x + 1, y, w - 2, 1);
-        R(g, RC.metal, x + 2, 41, 2, 2);
+        R(g, RC.tread, x, 39, w, 9);
+        R(g, RC.treadL, x, 39, w, 1);
+        for (let y = 41 + (f % 2); y < 47; y += 2) R(g, RC.treadL, x + 1, y, w - 2, 1);
+        R(g, RC.metal, x + 2, 42, 2, 2);
         R(g, RC.metal, x + w - 4, 44, 2, 2);
       }
+    } else if (side) {
+      const a = f === 1 ? -2 : f === 2 ? 2 : 0;
+      R(g, RC.metalD, 13 - a, 38, 3, 6); E(g, cD, 14 - a, 45, 4, 2);
+      R(g, RC.metal, 17 + a, 38, 3, 6); E(g, cS, 18 + a, 45, 4, 2);
     } else {
-      R(g, RC.metalD, side ? 12 : 9, 37, side ? 9 : 15, 3);
-      const xs = side ? [16 + (f === 1 ? -1 : f === 2 ? 1 : 0)] : [11, 21];
-      for (const cx of xs) {
-        E(g, RC.tread, cx, 44, 3, 3);
-        E(g, RC.treadL, cx, 44, 1, 1);
-        R(g, RC.metalL, cx + (f === 1 ? -1 : f === 2 ? 1 : 0), 42, 1, 1);
-      }
+      R(g, RC.metalD, 10, 38 - lu, 3, 6); E(g, cS, 11, 45 - lu, 4, 2); R(g, cL, 9, 44 - lu, 3, 1);
+      R(g, RC.metalD, 19, 38 - ru, 3, 6); E(g, cS, 20, 45 - ru, 4, 2); R(g, cL, 18, 44 - ru, 3, 1);
     }
 
-    // うで（まえから・うしろから は りょうがわ、よこからは てまえの 1ぽん）
-    const arm = (x, y, big) => {
+    // うで（まるい かた と みじかい て。lv1 は つよい アーム）
+    const big = parts.arm >= 1;
+    const arm = (x, y, flip) => {
+      E(g, cD, x + 2, y + 1, 3, 3);
+      E(g, cS, x + 2, y, 3, 3);
       if (big) {
-        E(g, RC.metalD, x + 2, y, 3, 3);
-        E(g, RC.metal, x + 2, y - 1, 2, 2);
-        R(g, RC.metal, x, y + 2, 5, 8);
-        R(g, RC.metalL, x, y + 2, 1, 8);
-        for (let k = 0; k < 8; k += 3) R(g, RC.hazard, x + 1, y + 3 + k, 3, 1);
+        R(g, RC.metal, x, y + 3, 5, 7);
+        R(g, RC.metalL, x, y + 3, 1, 7);
+        for (let k = 0; k < 6; k += 3) R(g, RC.hazard, x + 1, y + 4 + k, 3, 1);
         R(g, RC.metalD, x - 1, y + 10, 2, 3);
         R(g, RC.metalD, x + 4, y + 10, 2, 3);
       } else {
-        R(g, RC.metalD, x + 1, y, 3, 9);
-        R(g, RC.metal, x + 1, y, 1, 9);
-        R(g, RC.rust, x + 2, y + 4, 1, 1);
-        R(g, RC.metalD, x, y + 9, 1, 2);
-        R(g, RC.metalD, x + 4, y + 9, 1, 2);
+        R(g, RC.metalD, x + 1, y + 3, 3, 5);
+        E(g, cS, x + 2, y + 9, 2, 2);
+        R(g, cL, x + 1 + (flip ? 1 : 0), y + 8, 1, 1);
       }
     };
-    const big = parts.arm >= 1;
     if (!side) {
-      arm(big ? 1 : 3, 26 + ru, big);
-      arm(big ? 26 : 25, 26 + lu, big);
+      arm(1, 28 + ru + sink, false);
+      arm(26, 28 + lu + sink, true);
     }
 
-    // からだ
-    const bx = side ? 10 : 8, bw = side ? 13 : 17;
-    R(g, RC.bodyD, bx, 24, bw, 15);
-    R(g, RC.body, bx + 1, 24, bw - 2, 13);
-    R(g, RC.bodyL, bx + 1, 24, 2, 13);
-    R(g, RC.bodyD, bx, 36, bw, 1);
-    R(g, RC.rust, bx + bw - 4, 33, 2, 2);
-    R(g, RC.rustL, bx + bw - 4, 33, 1, 1);
-    if (dir === 'down') {
-      R(g, RC.panel, 12, 27, 9, 7);
-      R(g, on ? RC.green : RC.greenOff, 13, 28, 2, 2);
-      for (let k = 0; k < 3; k++) R(g, on ? RC.eyeOn : RC.eyeOff, 16 + k * 2 - 1, 31, 1, 2);
-      R(g, on ? RC.pink : RC.pinkOff, 13, 32, 7, 1);
-    } else if (dir === 'up') {
-      // せなかの でんち
-      R(g, RC.metalD, 11, 26, 11, 10);
-      R(g, RC.panel, 12, 27, 9, 8);
-      for (let k = 0; k < 3; k++) R(g, on ? RC.green : RC.greenOff, 13, 33 - k * 2, 7, 1);
-      R(g, RC.metal, 15, 25, 3, 1);
-    } else {
-      R(g, RC.panel, 18, 28, 4, 5);
-      R(g, on ? RC.green : RC.greenOff, 19, 29, 2, 1);
-    }
+    // からだ（たまごの ような まるい ドーム）
+    const cx = side ? 15 : 16, cy = 25 + sink;
+    E(g, cD, cx, cy + 1, side ? 11 : 12, 14);
+    E(g, cB, cx, cy, side ? 10 : 11, 13);
+    E(g, cS, cx + (side ? 3 : 4), cy + 4, side ? 6 : 6, 8);  // みぎしたの かげ
+    E(g, cB, cx - 1, cy - 1, side ? 8 : 9, 10);
+    E(g, cL, cx - 4, cy - 7, 3, 3);                          // ひかり
+    R(g, cL, cx - 6, cy - 4, 1, 3);
+    // ぬりが すこし はげた ところ
+    R(g, cD, cx + 5, cy + 7, 2, 1);
+    R(g, RC.rust, cx - 6, cy + 8, 2, 1);
 
-    // くび と あたま
-    R(g, RC.metalD, 14, 21 + slump, 5, 4);
-    const hy = 8 + slump;
-    const hx = side ? 9 : 7, hw = side ? 16 : 19;
-    R(g, RC.bodyD, hx, hy, hw, 14);
-    R(g, RC.body, hx + 1, hy, hw - 2, 12);
-    R(g, RC.bodyL, hx + 1, hy, hw - 2, 2);
-    R(g, RC.rust, hx + 2, hy + 9, 2, 1);
     if (dir === 'down') {
-      R(g, RC.visor, 9, hy + 4, 15, 6);
-      R(g, eye, 11, hy + 5, 4, on ? 3 : 1);
-      R(g, eye, 18, hy + 5, 4, on ? 3 : 1);
+      // バイザー と まるい 目
+      R(g, '#1a1e26', 7, cy - 8, 19, 9);
+      R(g, '#0e1016', 8, cy - 7, 17, 7);
+      R(g, '#3a4250', 8, cy - 8, 17, 1);
+      E(g, eye, 12, cy - 4, 3, on ? 3 : 1);
+      E(g, eye, 21, cy - 4, 3, on ? 3 : 1);
       if (on) {
-        R(g, '#ffffff', 11, hy + 5, 1, 1);
-        R(g, '#ffffff', 18, hy + 5, 1, 1);
+        E(g, '#bffcff', 11, cy - 5, 1, 1);
+        E(g, '#bffcff', 20, cy - 5, 1, 1);
+        R(g, '#ffffff', 11, cy - 6, 1, 1);
+        R(g, '#ffffff', 20, cy - 6, 1, 1);
       }
-      for (let x = 13; x < 20; x += 2) R(g, RC.metalD, x, hy + 11, 1, 2);
-      R(g, RC.metal, 5, hy + 5, 2, 4);
-      R(g, RC.metal, 26, hy + 5, 2, 4);
+      // よこの ボルト（みみ）と おなかの パネル
+      E(g, cA, 4, cy - 3, 1, 3);
+      E(g, cA, 28, cy - 3, 1, 3);
+      R(g, cS, 12, cy + 4, 9, 6);
+      R(g, cL, 12, cy + 4, 9, 1);
+      R(g, on ? RC.green : RC.greenOff, 13, cy + 6, 2, 2);
+      R(g, cA, 17, cy + 6, 3, 1);
+      R(g, cA, 17, cy + 8, 2, 1);
     } else if (dir === 'up') {
-      for (let y = hy + 4; y < hy + 11; y += 2) R(g, RC.bodyD, 10, y, 13, 1);
-      R(g, RC.metal, 5, hy + 5, 2, 4);
-      R(g, RC.metal, 26, hy + 5, 2, 4);
+      // せなか：でんちの ふた と つうき口
+      R(g, cS, 11, cy - 6, 11, 12);
+      R(g, cD, 11, cy + 5, 11, 1);
+      for (let k = 0; k < 3; k++) R(g, on ? RC.green : RC.greenOff, 13, cy + 2 - k * 3, 7, 1);
+      for (let x = 12; x < 21; x += 2) R(g, cD, x, cy - 4, 1, 3);
+      E(g, cA, 4, cy - 3, 1, 3);
+      E(g, cA, 28, cy - 3, 1, 3);
     } else {
-      R(g, RC.visor, 17, hy + 4, 8, 6);
-      R(g, eye, 20, hy + 5, 3, on ? 3 : 1);
-      if (on) R(g, '#ffffff', 20, hy + 5, 1, 1);
-      R(g, RC.metal, 11, hy + 5, 3, 4);
-      R(g, RC.metalL, 12, hy + 6, 1, 1);
+      // よこ：バイザーが まえに まわって、目が 1つ みえる
+      R(g, '#1a1e26', 15, cy - 8, 11, 9);
+      R(g, '#0e1016', 16, cy - 7, 9, 7);
+      E(g, eye, 21, cy - 4, 3, on ? 3 : 1);
+      if (on) { E(g, '#bffcff', 20, cy - 5, 1, 1); R(g, '#ffffff', 20, cy - 6, 1, 1); }
+      E(g, cA, 9, cy - 2, 2, 3);                              // みみの ボルト
+      E(g, cL, 9, cy - 3, 1, 1);
     }
 
-    // アンテナ（センサー）
-    const ax = side ? 14 : 16;
+    // アンテナ（lv0：おれて まがって いる、lv1：まっすぐ・ピンクの たま）
+    const ax = side ? 13 : 16, ay = cy - 13;
     if (parts.sensor >= 1) {
-      R(g, RC.metal, ax, hy - 6, 1, 6);
-      R(g, RC.metalD, ax + 1, hy - 6, 1, 6);
-      E(g, ball, ax, hy - 7, 2, 2);
-      if (on) R(g, '#ffd0f4', ax - 1, hy - 8, 1, 1);
+      R(g, RC.metal, ax, ay - 6, 1, 6);
+      R(g, RC.metalD, ax + 1, ay - 6, 1, 6);
+      E(g, on ? RC.pink : RC.pinkOff, ax, ay - 7, 2, 2);
+      if (on) R(g, '#ffd0f4', ax - 1, ay - 8, 1, 1);
     } else {
-      R(g, RC.metalD, ax, hy - 3, 1, 3);
-      R(g, RC.metalD, ax + 1, hy - 4, 1, 1);
-      R(g, RC.rust, ax + 2, hy - 5, 1, 1);
+      R(g, RC.metalD, ax, ay - 3, 1, 3);
+      R(g, RC.metalD, ax + 1, ay - 4, 2, 1);
+      E(g, RC.rust, ax + 3, ay - 4, 1, 1);
     }
 
-    // よこむきの うで（てまえ）
     if (side) {
       const sw = f === 1 ? 2 : f === 2 ? -2 : 0;
-      arm(13 + sw, 26, big);
+      arm(13 + sw, 28 + sink, false);
     }
-  }, '#11141c');
+    void bob;
+  }, '#2a2418');
 }
 
-// パーツの くみあわせ ごとに つくって おく
-function robotSpr(dir, f, parts, on) {
-  const key = `r_${dir}_${f}_${parts.legs}${parts.arm}${parts.sensor}_${on ? 1 : 0}`;
+// パーツと いろの くみあわせ ごとに つくって おく
+function robotSpr(dir, f, parts, on, color = 'ivory') {
+  const key = `r_${dir}_${f}_${parts.legs}${parts.arm}${parts.sensor}_${on ? 1 : 0}_${color}`;
   if (!SP[key]) {
-    SP[key] = dir === 'left' ? flipX(robotSpr('right', f, parts, on))
-      : robotSprite(dir === 'right' ? 'side' : dir, f, parts, on);
+    SP[key] = dir === 'left' ? flipX(robotSpr('right', f, parts, on, color))
+      : robotSprite(dir === 'right' ? 'side' : dir, f, parts, on, color);
   }
   return SP[key];
 }
@@ -1825,7 +1829,7 @@ function cropIcon(id) {
 }
 
 function seedIcon(id) {
-  const col = { nanohana: '#e8c21a', goma: '#8a6a3a', turnip: '#9b4cb5', carrot: '#e2781e', tomato: '#e2392c', pumpkin: '#e98a24' }[id];
+  const col = { nanohana: '#e8c21a', goma: '#8a6a3a', turnip: '#9b4cb5', dcarrot: '#e8c21a', sunflower: '#ff9a3f', carrot: '#e2781e', tomato: '#e2392c', pumpkin: '#e98a24' }[id] || '#8a8a8a';
   return oicon((g) => {
     R(g, '#c9b088', 3, 2, 24, 27);
     R(g, '#f6eedb', 4, 3, 22, 25);
@@ -1969,6 +1973,8 @@ function buildIcons() {
   }, '#2a2418');
   ICON.o_nanohana = oilIcon('#f2c94c', '#ffe68a');
   ICON.o_goma = oilIcon('#a8641e', '#d08a3e');
+  ICON.o_sun = oilIcon('#ff9a3f', '#ffd23f');
+  ICON.o_fish = oilIcon('#d8a83a', '#fff0b0');
   for (const [k, f] of Object.entries(FISH)) ICON[`f_${k}`] = fishIcon(f);
   // 光る すがた：ネオンの いろ と キラキラ
   for (const [k, gl] of Object.entries(GLOW)) {
@@ -2476,6 +2482,184 @@ function buildAreas() {
   }, '#121216');
 }
 
+// ---------- 2しょう：カワウソ・ろかそうち・あたらしい さくもつ と さかな ----------
+
+// 青く 光る オイル草（ほそながい は が 光る）
+function oilGrass(g, x0, y0, h, n, r) {
+  for (let k = 0; k < n; k++) {
+    const x = x0 + k * 4 - (n * 2), d = (k - (n - 1) / 2) * 0.35, len = h - Math.abs(k - (n - 1) / 2) * 3;
+    for (let i = 0; i < len; i++) {
+      const cx = Math.round(x + d * i * 0.6), cy = y0 - i;
+      R(g, i < len - 4 ? '#1f6a9a' : '#3fa8e0', cx, cy, 2, 1);
+      if (i % 3 === 0) R(g, '#7fe8ff', cx, cy, 1, 1);
+    }
+    R(g, '#bff6ff', Math.round(x + d * len * 0.6), y0 - len, 1, 1);
+  }
+  for (let i = 0; i < 5; i++) R(g, 'rgba(127,232,255,.55)', x0 - 8 + ((r() * 16) | 0), y0 - 4 - ((r() * h) | 0), 1, 1);
+}
+
+function buildCh2() {
+  const r = RNG(61);
+  // オイル草（はたけ・プランターの さいご の すがた と、そとに さいている もの）
+  SP.crop_nanohana_3 = osp(32, 40, (g) => oilGrass(g, 16, 38, 26, 5, r));
+  SP.wild = osp(30, 36, (g) => oilGrass(g, 15, 35, 28, 5, r));
+  ICON.c_nanohana = oicon((g) => {
+    oilGrass(g, 15, 27, 22, 5, r);
+    R(g, '#8a6a48', 9, 22, 13, 3);              // たば ねた ひも
+  }, '#0e2a3a');
+  ICON.seed_nanohana = oicon((g) => {
+    R(g, '#c9b088', 3, 2, 24, 27);
+    R(g, '#f6eedb', 4, 3, 22, 25);
+    R(g, '#3fa8e0', 4, 3, 22, 7);
+    oilGrass(g, 15, 25, 12, 3, r);
+  }, '#5a4228');
+
+  // ライトかぶ：まるくて しろく、ほんのり 光る
+  const turnip = SP.crop_turnip_3;
+  SP.crop_turnip_3 = make(turnip.width, turnip.height, (g) => {
+    E(g, 'rgba(255,244,180,.35)', 17, 32, 11, 9);
+    g.drawImage(turnip, 0, 0);
+    for (const [x, y] of [[8, 30], [26, 28], [17, 22], [12, 38]]) R(g, '#fff4b0', x, y, 1, 1);
+  });
+
+  // でんきニンジン（黄色く ピカピカ）
+  SP.crop_dcarrot_3 = osp(32, 40, (g) => {
+    for (const a of [-0.6, -0.2, 0.2, 0.6]) {
+      const dx = Math.sin(a), dy = -Math.cos(a);
+      for (let i = 0; i < 15; i++) R(g, i % 3 ? '#3f8a32' : '#86cf5e', Math.round(16 + dx * i), Math.round(29 + dy * i), 2, 1);
+    }
+    E(g, 'rgba(255,230,80,.45)', 16, 32, 9, 5);
+    E(g, '#e8c21a', 16, 32, 6, 3);
+    R(g, '#fff07a', 12, 30, 6, 1);
+    R(g, '#a88a10', 12, 34, 9, 1);
+    for (const [x, y] of [[8, 28], [24, 30], [16, 24]]) { R(g, '#fff07a', x, y, 1, 3); R(g, '#fff07a', x - 1, y + 1, 3, 1); }
+    R(g, '#5e3820', 9, 35, 15, 2);
+  });
+  ICON.c_dcarrot = oicon((g) => {
+    for (let i = 0; i < 18; i++) {
+      const w = Math.max(1, Math.round(5 - i * 0.26));
+      R(g, '#e8c21a', 19 - i - w + 1, 9 + i - w + 1, w * 2, w * 2 - 1);
+    }
+    for (let i = 0; i < 16; i++) R(g, '#fff07a', 16 - i, 8 + i, 1, 1);
+    R(g, '#3f8a32', 20, 3, 2, 7); R(g, '#86cf5e', 23, 4, 2, 6);
+    for (const [x, y] of [[4, 6], [26, 16], [10, 26]]) { R(g, '#fff07a', x, y, 1, 3); R(g, '#fff07a', x - 1, y + 1, 3, 1); }
+  });
+  // ネオンひまわり（大きな 花が ネオン色に 光る）
+  SP.crop_sunflower_3 = osp(36, 56, (g) => {
+    R(g, '#2c6624', 17, 22, 3, 34);
+    leaf(g, 17, 46, 9, -1.4, '#3f8a32', '#5fae45');
+    leaf(g, 19, 38, 9, 1.4, '#3f8a32', '#5fae45');
+    E(g, 'rgba(255,79,216,.35)', 18, 14, 15, 13);
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      E(g, k % 2 ? '#ffd23f' : '#ff9a3f', Math.round(18 + Math.cos(a) * 9), Math.round(14 + Math.sin(a) * 8), 3, 3);
+    }
+    E(g, '#5a3a1a', 18, 14, 6, 5);
+    E(g, '#7a5228', 17, 13, 4, 3);
+    E(g, '#5ff6ff', 18, 14, 6, 5); E(g, '#5a3a1a', 18, 14, 5, 4); // ネオンの わ
+    for (let k = 0; k < 6; k++) R(g, '#3a2210', 15 + (k % 3) * 2, 12 + (k >> 1), 1, 1);
+  });
+  ICON.c_sunflower = oicon((g) => {
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      E(g, k % 2 ? '#ffd23f' : '#ff9a3f', Math.round(15 + Math.cos(a) * 9), Math.round(14 + Math.sin(a) * 9), 3, 3);
+    }
+    E(g, '#5ff6ff', 15, 14, 6, 6);
+    E(g, '#5a3a1a', 15, 14, 5, 5);
+    R(g, '#2c6624', 14, 24, 2, 6);
+  });
+  for (const [id, col] of [['dcarrot', '#e8c21a'], ['sunflower', '#ff9a3f']]) {
+    ICON[`seed_${id}`] = oicon((g) => {
+      R(g, '#c9b088', 3, 2, 24, 27);
+      R(g, '#f6eedb', 4, 3, 22, 25);
+      R(g, col, 4, 3, 22, 7);
+      g.drawImage(ICON[`c_${id}`], 7, 9, 16, 16);
+    }, '#5a4228');
+  }
+
+  // さびた 歯車（水ろの そこ）
+  ICON.m_gear = oicon((g) => {
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      R(g, '#7a5a3a', Math.round(15 + Math.cos(a) * 11) - 2, Math.round(15 + Math.sin(a) * 11) - 2, 5, 5);
+    }
+    E(g, '#8a6a48', 15, 15, 10, 10);
+    E(g, '#a87a4e', 13, 13, 6, 6);
+    E(g, '#3a2a1a', 15, 15, 3, 3);
+    for (const [x, y] of [[8, 18], [20, 9], [19, 21]]) R(g, '#c07a44', x, y, 3, 2);
+  }, '#2a1a0a');
+
+  // 海の いきもの：カニ と タコ
+  ICON.f_kani = oicon((g) => {
+    E(g, '#b5221a', 15, 18, 10, 6);
+    E(g, '#e2392c', 15, 17, 9, 5);
+    for (const x of [6, 24]) { E(g, '#e2392c', x, 9, 4, 3); R(g, '#b5221a', x - 1, 11, 3, 5); }
+    for (let k = 0; k < 3; k++) { R(g, '#b5221a', 4 + k * 2, 22 + k, 4, 1); R(g, '#b5221a', 22 - k * 2, 22 + k, 4, 1); }
+    R(g, '#ffffff', 12, 13, 2, 2); R(g, '#ffffff', 17, 13, 2, 2);
+    R(g, '#1a1a1a', 12, 14, 1, 1); R(g, '#1a1a1a', 18, 14, 1, 1);
+    R(g, '#5ff6ff', 14, 19, 3, 1);                // でんきの ひかり
+  });
+  ICON.f_tako = oicon((g) => {
+    E(g, '#8a3a9a', 15, 11, 9, 8);
+    E(g, '#b05ac2', 14, 10, 7, 6);
+    for (let k = 0; k < 6; k++) {
+      const x = 5 + k * 4;
+      for (let y = 17; y < 27; y++) R(g, '#8a3a9a', x + Math.round(Math.sin(y * 0.6 + k) * 1.5), y, 2, 1);
+    }
+    R(g, '#ffffff', 11, 10, 2, 3); R(g, '#ffffff', 17, 10, 2, 3);
+    R(g, '#1a1a1a', 12, 11, 1, 2); R(g, '#1a1a1a', 18, 11, 1, 2);
+    R(g, '#ff9ae8', 9, 6, 2, 2);
+  });
+
+  // サイバーカワウソ（ゴーグル と せなかの 水タンク）。weak：ネオンスポアまみれで たおれている
+  const otter = (weak) => osp(32, weak ? 24 : 40, (g) => {
+    const fur = weak ? '#6a5a50' : '#8a6040', furL = weak ? '#8a7a70' : '#b0845a', belly = '#e8d2b0';
+    if (weak) {
+      E(g, fur, 16, 15, 13, 6);
+      E(g, belly, 14, 17, 8, 3);
+      E(g, fur, 5, 12, 5, 4);
+      R(g, '#2a1a10', 3, 11, 2, 1);                // とじた 目
+      R(g, '#3a2a20', 26, 16, 6, 2);                // しっぽ
+      sporeMoss(g, r, 4, 8, 26, 12, 16);
+      return;
+    }
+    R(g, '#3d434c', 20, 14, 8, 14);                 // 水タンク
+    R(g, '#5ff6ff', 21, 16, 6, 8);
+    R(g, '#8a929e', 20, 14, 8, 2);
+    R(g, fur, 24, 30, 6, 4);                        // しっぽ
+    E(g, fur, 15, 26, 9, 11);
+    E(g, belly, 14, 28, 5, 8);
+    E(g, fur, 15, 11, 8, 7);                        // あたま
+    E(g, furL, 13, 9, 4, 3);
+    E(g, belly, 15, 14, 4, 3);
+    R(g, '#2a1a10', 14, 13, 3, 2);                  // はな
+    R(g, '#3d434c', 7, 7, 17, 4);                   // ゴーグル
+    E(g, '#5ff6ff', 11, 9, 2, 1); E(g, '#5ff6ff', 19, 9, 2, 1);
+    R(g, '#bffcff', 10, 8, 1, 1); R(g, '#bffcff', 18, 8, 1, 1);
+    E(g, fur, 8, 4, 2, 2); E(g, fur, 22, 4, 2, 2);  // みみ
+    R(g, fur, 8, 26, 3, 6); R(g, fur, 20, 26, 3, 6); // て
+    R(g, '#4a3020', 10, 36, 4, 3); R(g, '#4a3020', 17, 36, 4, 3);
+  }, '#2a1a10');
+  SP.otter = otter(false);
+  SP.otterWeak = otter(true);
+  SP.otterHop = make(SP.otter.width, SP.otter.height + 2, (g) => g.drawImage(SP.otter, 0, 0));
+
+  // なおった ろかそうち（みどりの ランプ・きれいな 水が ながれる）
+  SP.filterOk = osp(62, 64, (g) => {
+    R(g, '#4a5058', 4, 18, 46, 46);
+    R(g, '#6a7078', 6, 18, 42, 3);
+    R(g, '#3d434c', 50, 34, 12, 8);
+    R(g, '#5fd8ea', 52, 36, 10, 4);                 // きれいな 水
+    R(g, '#3d434c', 18, 4, 14, 16);
+    E(g, '#5d6470', 25, 6, 8, 4);
+    R(g, '#14161e', 12, 28, 30, 18);
+    for (let y = 30; y < 44; y += 3) R(g, '#3fa8d8', 14, y, 26, 1);
+    R(g, '#7dff9a', 40, 50, 6, 4);
+    R(g, '#c0ffd0', 41, 51, 2, 1);
+    R(g, '#ffd23f', 10, 50, 4, 4);
+  }, '#0b0d14');
+}
+
 function buildSprites() {
   buildNature();
   buildBuildings();
@@ -2485,6 +2669,7 @@ function buildSprites() {
   buildPlayer();
   buildCrops();
   buildIcons();
+  buildCh2(); // さいごに：2しょうの え で うわがき
 }
 
 // DOM に だす ための がぞう（おなじ ものは つくりなおさない）

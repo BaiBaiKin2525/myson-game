@@ -512,6 +512,10 @@ function canUseDoor(door) {
     UI.say('もっている ものを ごうせい そうちに {入|い}れてから でかけよう。');
     return false;
   }
+  if (G.save.carryOtter && door.to !== 'house' && door.to !== 'out') {
+    UI.say('カワウソが ぐったり して いる… さきに けんきゅう{室|しつ}の サイバーか そうちへ はこぼう。');
+    return false;
+  }
   if (!AREA_BUILD[door.to] && door.to !== 'house' && door.to !== 'out') {
     const a = AREAS[door.to];
     UI.say(`この さきは「${a ? a.name : '？？？'}」。\nまだ つくって いる ところ だよ。（${a ? a.ch : '？'}しょうで {行|い}ける よてい）`);
@@ -664,15 +668,23 @@ const ACT = {
     else potAction(o.pid);
   },
   pod(o) {
-    if (G.save.fixed.pod) {
-      UI.say(['サイバーか そうち。あかい ランプが {光|ひか}って いる。「{水|みず}が ありません」', '{外|そと}の {水|みず}ろを きれいに すれば うごきそう…（2しょうで できるよ）']);
+    const s = G.save;
+    if (s.fixed.pod) {
+      if (!s.flags.cleanWater) UI.say(['サイバーか そうち。あかい ランプが {光|ひか}って いる。「{水|みず}が ありません」', '{外|そと}の {水|みず}ろの ろかそうちを {直|なお}せば うごきそう…']);
+      else if (s.carryOtter) healOtter();
+      else UI.say(['サイバーか そうち。きれいな {水|みず}が とどいて、みどりの ランプが ついて いる。', s.flags.otter ? 'カワウソは ここで げんきに なったんだ。' : 'よわった どうぶつを つれて くれば、なおせるよ。']);
       return;
     }
     tryFix('pod', () => { o.spr = 'podOn'; }, ch1Clear);
   },
   filter() {
-    UI.say(['{水|みず}ろの「ろかそうち」。さびて、ネオンスポアが びっしり くっついて いる…', 'いまは まだ {直|なお}せない。（2しょうで {直|なお}すよ）']);
+    const s = G.save;
+    if (s.fixed.filter) UI.say('ろかそうち。ゴウンゴウン… きれいな {水|みず}が ながれて いく。');
+    else if ((s.ch || 1) < 2) UI.say(['{水|みず}ろの「ろかそうち」。さびて、ネオンスポアが びっしり くっついて いる…', 'いまは まだ {直|なお}せない。（2しょうで {直|なお}すよ）']);
+    else fixFilter();
   },
+  otterWeak(o) { findOtter(o); },
+  otter() { talkOtter(); },
   // あれた 町の もの：しらべると ひとこと
   look(o) {
     const lines = {
@@ -690,7 +702,8 @@ const ACT = {
   },
   gate(o) {
     const g = GATES[o.gid], a = AREAS[g.to];
-    UI.say([`がれきと ネオンスポアの きりで {道|みち}が ふさがって いる…`, `この さきは「${a.name}」。${g.ch}しょうで {通|とお}れる ように なるよ。`]);
+    const when = g.flag === 'cleanWater' && (G.save.ch || 1) >= g.ch ? '{水|みず}ろの ろかそうちを {直|なお}すと {通|とお}れる かも' : `${g.ch}しょうで {通|とお}れる ように なるよ`;
+    UI.say([`がれきと ネオンスポアの きりで {道|みち}が ふさがって いる…`, `この さきは「${a.name}」。${when}。`]);
   },
   airTree() {
     UI.say(['{空気|くうき}じょうか ツリー。ネオンスポアを すいこんで {空気|くうき}を きれいに する きかいの {木|き}。', 'いまは かれて、うごいて いない…（4しょうで うごかすよ）']);
@@ -700,7 +713,10 @@ const ACT = {
   signPlaza() { UI.say('「ちゅうおう {広場|ひろば}」\n{北|きた}：ネオン こうざん　ひがし：ネオン しょう{店|てん}がい　{南|みなみ}：けんきゅう{室|しつ}'); },
   boat(o) { UI.say(['こわれた ボート。そこに あなが あいて いる…', '3しょうの メカ{工|こう}ぼうで {直|なお}して もらえる かも。{直|なお}すと {海|うみ}の おきで つりが できるよ！']); },
   signPier() { UI.say('「ていぼう」\nここから {海|うみ}に むかって つりざおを つかおう。'); },
-  signFarm() { UI.say('「はたけ」\nいまは ネオンスポアが こくて、はたけに できない…\n（2しょうで ひらくよ。いまは けんきゅう{室|しつ}の プランターで そだてよう）'); },
+  signFarm() {
+    if ((G.save.ch || 1) >= 2) UI.say('「はたけ」\nくわで くさを かって、つちを たがやそう。\nたねを まいて、{毎日|まいにち} じょうろで {水|みず}を あげよう！');
+    else UI.say('「はたけ」\nいまは ネオンスポアが こくて、はたけに できない…\n（2しょうで ひらくよ。いまは けんきゅう{室|しつ}の プランターで そだてよう）');
+  },
   signCanal() { UI.say('「{水|みず}ろ」\n{水|みず}の {前|まえ}で つりざおを つかおう。\nうきが ツンツン した あと、スパッと しずんだら Ⓐ！'); },
 };
 
@@ -713,13 +729,28 @@ const nextFix = () => CH1.find((c) => !G.save.fixed[c.id]);
 function goalText() {
   const s = G.save;
   if (!s || !s.flags.awake || !s.flags.named) return '';
-  if (s.flags.ch1done) return '🎯 2しょうは もうすぐ！ {水|みず}ろで つりを しよう';
+  if (s.flags.ch1done) return goalCh2();
   const n = nextFix();
   if (!n) return '';
   if (n.id === 'pod' && !s.flags.oiled) return s.fixed.press ? '🎯 バリアオイルを つくって {体|からだ}に ぬろう' : '';
   const have = Object.entries(n.mats).map(([k, need]) => `${ITEMS[k].name} ${Math.min(need, s.items[k] || 0)}/${need}`).join('・');
   const where = { panel: 'かべの メインパネルを しらべよう', planter: 'プランターを {直|なお}そう', press: 'オイル しぼりきを {直|なお}そう', pod: 'サイバーか そうちを {直|なお}そう' }[n.id];
   return `🎯 ${where}${have ? `（${have}）` : ''}`;
+}
+
+function goalCh2() {
+  const s = G.save;
+  if ((s.ch || 1) < 2) return '🎯 スリープ ポッドで ねて、あしたの {朝|あさ}を まとう';
+  if (!s.fixed.filter) {
+    const g = s.items.m_gear || 0;
+    if (g < GEARS_NEED) return `🎯 {水|みず}ろで さびた はぐるまを つろう（${g}/${GEARS_NEED}）`;
+    const have = Object.entries(FILTER_FIX.mats).filter(([k]) => k !== 'm_gear').map(([k, n]) => `${ITEMS[k].name} ${Math.min(n, s.items[k] || 0)}/${n}`);
+    const oil = Object.keys(OILS).reduce((a, id) => a + (s.items[id] || 0), 0);
+    return `🎯 ろかそうちを {直|なお}そう（${have.join('・')}・バリアオイル ${Math.min(1, oil)}/1）`;
+  }
+  if (!s.flags.otter) return s.carryOtter ? '🎯 カワウソを サイバーか そうちへ はこぼう' : '🎯 {水|みず}ろの きしで なにかが たおれて いる…';
+  if (s.otterFed !== s.day) return '🎯 カワウソに {魚|さかな}を あげよう';
+  return '';
 }
 
 // なおす。after：なおった ときに え を かえる、then：ビデオの あと
@@ -773,13 +804,182 @@ function ch1Clear() {
     'ピピッ… サイバーか そうちの ランプが あかく {光|ひか}った。「{水|みず}が ありません」',
     '{name}「{外|そと}の {水|みず}ろの ろかそうちを {直|なお}せば、きれいな {水|みず}が くる…！」',
     '★ 1しょう「100{年|ねん}{目|め}の さいきどう」クリア！ ★',
-    'つづきの 2しょう「ネオン{水|みず}ろの じょうか」は もうすぐ できるよ。それまで {水|みず}ろで つりを したり、プランターで そだてたり して まってね！',
+    'つぎの {日|ひ}から 2しょう「ネオン{水|みず}ろの じょうか」が はじまるよ。スリープ ポッドで ねて、あしたの {朝|あさ}を まとう！',
   ], () => {
     s.flags.ch1done = true;
     UI.hud();
     persist();
   });
   Sfx.play('catch');
+}
+
+// ---------- 2しょう：ネオン水ろの じょうか ----------
+
+// 1しょうを クリアした つぎの 朝に はじまる：さびた くわ と たね、ビデオ05
+function startCh2() {
+  const s = G.save;
+  s.ch = Math.max(2, s.ch || 1);
+  s.tools.hoe = 1;
+  for (const [k, n] of Object.entries(CH2_SEEDS)) s.seeds[k] = (s.seeds[k] || 0) + n;
+  s.sel = 'hoe';
+  rebuildAreas();
+  UI.hotbar();
+  UI.hud();
+  persist();
+  UI.say('ピピッ… メインパネルに あたらしい ビデオが とどいた！', () => playVideo(5, () => {
+    Sfx.play('catch');
+    UI.say([
+      '★ 2しょう「ネオン{水|みず}ろの じょうか」 ★',
+      '{name}は「さびた くわ」と、でんきニンジン・ネオンひまわりの たねを てに いれた！',
+      '{外|そと}の はたけで、くわを えらんで くさの {前|まえ}で Ⓐ！',
+      'よごれた {水|みず}ろで つりを すると、さびた はぐるまが つれる ことが あるよ。',
+    ]);
+  }));
+}
+
+// ろかそうちを なおす（はぐるま・ねじ・てつくず・どの バリアオイルでも 1つ・電池）
+function fixFilter() {
+  const s = G.save, c = FILTER_FIX;
+  const oils = Object.keys(OILS).filter((id) => s.items[id] > 0);
+  const lackMat = Object.entries(c.mats).some(([k, n]) => (s.items[k] || 0) < n);
+  const cost = `${matList(c.mats)}・バリアオイル 1こ・{電池|でんち}🔋${c.energy}`;
+  if (lackMat || oils.length < c.oil) {
+    UI.say([
+      '{水|みず}ろの「ろかそうち」。さびて、ネオンスポアが びっしり くっついて いる…',
+      `{直|なお}すには ${cost}が いる。`,
+      (s.items.m_gear || 0) < GEARS_NEED ? 'さびた はぐるまは、よごれた {水|みず}ろの そこに しずんで いる。つりざおで つりあげよう！'
+        : lackMat ? 'ねじと てつくずは、こわれた きかいを ごうせい そうちに {入|い}れると {出|で}るよ。'
+        : 'バリアオイルは オイル しぼりきで つくれるよ。',
+    ]);
+    return;
+  }
+  UI.ask(`ろかそうちを {直|なお}す？\n（${cost}）`, ['{直|なお}す', 'やめる'], (k) => {
+    if (k !== 0) return;
+    if (!spend(c.energy)) return;
+    takeItems(c.mats);
+    takeItems({ [oils[0]]: 1 });
+    s.fixed.filter = true;
+    s.flags.cleanWater = true;
+    Sfx.play('power');
+    rebuildAreas();
+    UI.hud();
+    persist();
+    playVideo(6, () => UI.say([
+      'ゴウンゴウン… {水|みず}ろの {水|みず}が すきとおって いく！',
+      '{南|みなみ}の {道|みち}を ふさいで いた がれきが、{水|みず}に ながされた！ {海|うみ}へ {行|い}けるよ。',
+      '…あれ？ {水|みず}ろの きしで、なにかが たおれて いる…',
+    ]));
+  });
+}
+
+// きれいに なった 水ろを ながれて きた、よわった カワウソ
+function findOtter(o) {
+  const s = G.save;
+  UI.say([
+    '{水|みず}ろの きしに、ちいさな どうぶつが たおれて いる…',
+    'カワウソだ！ ネオンスポアが びっしり ついて、ぐったり して いる。',
+    '{name}「けんきゅう{室|しつ}の サイバーか そうちなら、なおせる かも！」',
+  ], () => UI.ask('カワウソを だっこして はこぶ？', ['はこぶ', 'まだ'], (k) => {
+    if (k !== 0) return;
+    removeObj(G.map, o);
+    s.carryOtter = true;
+    Sfx.play('pick');
+    UI.toast('カワウソを だっこした！ けんきゅう{室|しつ}の サイバーか そうちへ はこぼう', 2800);
+    UI.hud();
+    persist();
+  }));
+}
+
+function healOtter() {
+  const s = G.save;
+  UI.ask(`カワウソを サイバーか そうちに ねかせる？\n（{電池|でんち}🔋${OTTER_HEAL}）`, ['なおす', 'まだ'], (k) => {
+    if (k !== 0) return;
+    if (!spend(OTTER_HEAL)) return;
+    s.carryOtter = false;
+    s.flags.otter = true;
+    Sfx.play('power');
+    rebuildAreas();
+    UI.hud();
+    persist();
+    UI.say([
+      'ウィーン… カプセルに きれいな {水|みず}が みたされて いく…',
+      'ネオンスポアが とけて、カワウソの {目|め}に {光|ひかり}が ともった！',
+      'カワウソ「…プイ？ ここは どこだプイ？」',
+      'カワウソ「たすけて くれて ありがとうだプイ！ ボクも はたけを てつだうプイ！」',
+    ], () => playVideo(8, ch2Clear));
+  });
+}
+
+function ch2Clear() {
+  const s = G.save;
+  if (s.flags.ch2done) return;
+  Sfx.play('catch');
+  UI.say([
+    'カワウソは {外|そと}の {水|みず}ろの そばで くらす ことに なった。',
+    '{魚|さかな}を あげると、つぎの {日|ひ}の {朝|あさ}に はたけと プランターに {水|みず}を まいて くれるよ。',
+    '★ 2しょう「ネオン{水|みず}ろの じょうか」クリア！ ★',
+    'つづきの 3しょうは もうすぐ できるよ。それまで {海|うみ}で つりを したり、はたけで そだてたり して まってね！',
+  ], () => {
+    s.flags.ch2done = true;
+    UI.hud();
+    persist();
+  });
+}
+
+// カワウソ：その日に 魚を あげると、つぎの 朝に 水やり（と ときどき 魚の おすそわけ）
+const OTTER_FISH = Object.keys(FISH).filter((k) => FISH[k].tier === 1 && !FISH[k].sea);
+function talkOtter() {
+  const s = G.save;
+  if (s.otterFed === s.day) {
+    UI.say(pickOne([
+      'カワウソ「おなか いっぱいだプイ！ あしたの {朝|あさ}、{水|みず}やりは まかせてプイ！」',
+      'カワウソ「{水|みず}が きれいで きもちいいプイ〜」',
+      'カワウソ「{name}は はたらきものだプイ！」',
+    ]));
+    return;
+  }
+  Sfx.play('ui');
+  UI.panel('カワウソに ごはん', (box) => {
+    box.appendChild(el('p', 'help', 'カワウソ「おなかが すいたプイ…」<br>{魚|さかな}を あげると、あしたの {朝|あさ}に はたけと プランターに {水|みず}を まいて くれるよ。<br>カワウソエビと メダカッチが だいこうぶつ！'));
+    const list = Object.entries(s.items).filter(([id, n]) => n > 0 && id.startsWith('f_'));
+    if (!list.length) {
+      box.appendChild(el('p', 'empty', '{魚|さかな}を もって いないよ。{水|みず}ろで つって こよう！<br>（{光|ひか}る {魚|さかな}は ネオンスポアが ついて いて たべられないよ）'));
+      return;
+    }
+    for (const [id, n] of list) {
+      const f = FISH[id.slice(2)];
+      const row = el('div', 'row');
+      row.innerHTML = rbh(`${iconImg(id, 'ic m')}<div class="info"><div class="nm">${f.name} × ${n}</div><div class="ds">${f.love ? '💗 だいこうぶつ！' : 'たべて くれるよ'}</div></div>`);
+      const bb = el('div', 'btns');
+      const bt = el('button', 'buy', 'あげる');
+      bt.onclick = () => feedOtter(id);
+      bb.appendChild(bt);
+      row.appendChild(bb);
+      box.appendChild(row);
+    }
+  });
+}
+
+function feedOtter(id) {
+  const s = G.save;
+  if (!(s.items[id] > 0)) return;
+  const f = FISH[id.slice(2)];
+  if (--s.items[id] <= 0) delete s.items[id];
+  s.otterFed = s.day;
+  if (f.love) s.otterLove = s.day;
+  UI.closePanel();
+  Sfx.play('harvest');
+  const o = G.map.objs.find((x) => x.t === 'otter');
+  if (o) addFx(f.love ? '💗💗' : '💗', '#ff9ae8', (o.x + 0.5) * T, o.y * T - 10);
+  UI.say(f.love ? [
+    `カワウソ「わあっ！ ${f.name}だプイ！ だいこうぶつだプイ〜！」`,
+    'カワウソ「あしたの {朝|あさ}、はたけの {水|みず}やりは まかせてプイ！ おみやげも あるかも だプイ！」',
+  ] : [
+    'カワウソ「もぐもぐ… おいしいプイ！」',
+    'カワウソ「あしたの {朝|あさ}、はたけと プランターに {水|みず}を まいて おくプイ！」',
+  ]);
+  UI.hud();
+  persist();
 }
 
 // はかせの ビデオ（100年まえの ろくが）を うつす
@@ -887,7 +1087,7 @@ function rollSynth(kind) {
   if (kind === 'machine') s.synthMiss = pick === 'm_screw' ? 0 : s.synthMiss + 1;
   if (!pick) return null;
   if (pick === 'seed') {
-    const k = pickOne(SYNTH_SEEDS);
+    const k = pickOne((s.ch || 1) >= 2 ? [...SYNTH_SEEDS, ...SYNTH_SEEDS_CH2] : SYNTH_SEEDS);
     s.seeds[k] = (s.seeds[k] || 0) + 1;
     return { name: `${CROPS[k].name}の たね`, icon: `seed_${k}` };
   }
@@ -995,7 +1195,7 @@ function openPress() {
     for (const [id, o] of Object.entries(OILS)) {
       const have = s.items[o.from] || 0;
       const row = el('div', 'row');
-      row.innerHTML = `${iconImg(id, 'ic m')}<div class="info"><div class="nm">${o.name}</div><div class="ds">${ITEMS[o.from].name} ${o.need}こ → 1こ（さすと 🛢+${o.oil}）。もっている ${ITEMS[o.from].name}：${have}こ</div></div>`;
+      row.innerHTML = rbh(`${iconImg(id, 'ic m')}<div class="info"><div class="nm">${o.name}</div><div class="ds">${ITEMS[o.from].name} ${o.need}こ → 1こ（ぬると 🛢+${o.oil}）。もっている ${ITEMS[o.from].name}：${have}こ</div></div>`);
       const bb = el('div', 'btns');
       const bt = el('button', `buy${have < o.need ? ' off' : ''}`, 'しぼる');
       bt.onclick = () => pressMake(id);
@@ -1106,8 +1306,9 @@ function useItem(tx, ty, o) {
   }
   if (sel === 'rod') return startFishing(tx, ty);
   if (sel === 'net') return UI.say('ちいさな むしあみ。');
-  if (sel === 'kasu' || sel === 'can' || sel.startsWith('seed:')) {
-    UI.toast('けんきゅう{室|しつ}の プランターの {前|まえ}で つかおう');
+  const farmOpen = G.map.id === 'out' && (G.save.ch || 1) >= 2;
+  if ((sel === 'kasu' || sel === 'can' || sel.startsWith('seed:')) && !farmOpen) {
+    UI.toast((G.save.ch || 1) >= 2 ? 'プランターか、{外|そと}の はたけで つかおう' : 'けんきゅう{室|しつ}の プランターの {前|まえ}で つかおう');
     return;
   }
   if (G.map.id !== 'out') {
@@ -1117,6 +1318,7 @@ function useItem(tx, ty, o) {
   }
   if (sel === 'hoe') return useHoe(tx, ty, o);
   if (sel === 'can') return useCan(tx, ty);
+  if (sel === 'kasu') return useKasu(tx, ty);
   if (sel.startsWith('seed:')) return plantSeed(sel.slice(5), tx, ty);
 }
 
@@ -1169,6 +1371,25 @@ function useHoe(tx, ty, o) {
     s.flags.firstTill = true;
     UI.toast('たがやした！ おみせで たねを かって まこう', 2600);
   }
+  persist();
+}
+
+function useKasu(tx, ty) {
+  const s = G.save;
+  const pl = s.plots[`${tx},${ty}`];
+  if (!pl || !pl.c) {
+    UI.toast('たねを まいた ところに まこう');
+    return;
+  }
+  if (pl.f) {
+    UI.toast('もう ひりょうを まいたよ');
+    return;
+  }
+  if (--s.items.m_kasu <= 0) delete s.items.m_kasu;
+  pl.f = 1;
+  Sfx.play('plant');
+  UI.toast('ひりょうを まいた！ {水|みず}を あげると ぐんぐん そだつよ', 2400);
+  UI.hotbar();
   persist();
 }
 
@@ -1229,6 +1450,7 @@ function harvest(pl, tx, ty) {
   s.totals.harvest++;
   pl.c = null;
   pl.w = 0;
+  pl.f = 0;
   Sfx.play('harvest');
   addFx(`${CROPS[id].name}！`, '#ffffff', (tx + 0.5) * T, ty * T);
   UI.toast(`${CROPS[id].name}を しゅうかく！`);
@@ -1243,6 +1465,9 @@ function sleep() {
   fadeTo(1, () => {
     const s = G.save;
     let grown = 0, ready = 0;
+    const helped = s.flags.otter && s.otterFed === s.day;
+    const love = s.otterLove === s.day;
+    const ch2 = s.flags.ch1done && (s.ch || 1) < 2;
     for (const pl of [...Object.values(s.plots), ...s.pots]) {
       if (pl.c && pl.w && pl.c.d < CROPS[pl.c.id].days) {
         pl.c.d = Math.min(CROPS[pl.c.id].days, pl.c.d + (pl.f ? KASU_BOOST : 1)); // ひりょうが あると 2日ぶん
@@ -1252,6 +1477,14 @@ function sleep() {
       if (pl.c && pl.c.d >= CROPS[pl.c.id].days) ready++;
     }
     s.day++;
+    let gift = null;
+    if (helped) {
+      for (const pl of [...Object.values(s.plots), ...s.pots]) if (pl.c && pl.c.d < CROPS[pl.c.id].days) pl.w = 1;
+      if (Math.random() < (love ? 0.7 : OTTER_GIFT)) {
+        gift = pickOne(OTTER_FISH);
+        addItem(`f_${gift}`);
+      }
+    }
     useOil(CFG.oil.perDay);
     for (const o of G.maps.out.objs) if (o.t === 'wild') o.spr = wildReady(s, o.wid) ? 'wild' : 'wildPicked';
     G.p.dir = 'down';
@@ -1266,8 +1499,10 @@ function sleep() {
         const lines = [`ピピッ… ${s.day}{日目|にちめ}の {朝|あさ}。スリープ かいじょ！`];
         if (grown) lines.push(`{水|みず}を あげた さくもつが そだったよ！${ready ? `\nしゅうかく できる ものが ${ready}こ あるよ！` : ''}`);
         if (s.oil < CFG.oilGlow) lines.push('バリアオイル🛢が すくないよ。{体|からだ}に ネオンスポアが くっついて いる…\nしぼりきで つくって、もちもの🎒から ぬろう！');
+        if (helped) lines.push('カワウソ「おはようだプイ！ はたけと プランターに {水|みず}を まいて おいたプイ！」');
+        if (gift) lines.push(`カワウソ「${FISH[gift].name}を とって きたプイ！ あげるプイ！」`);
         if (s.stamina < 10 && !unlimitedStamina()) lines.push('{電池|でんち}🔋が すくないね。\n{算数|さんすう}アプリの「じつりょくテスト」で じゅう{電|でん} しよう！');
-        UI.say(lines);
+        UI.say(lines, ch2 ? startCh2 : undefined);
       }, 600);
     }, 1300);
   }, 700);
@@ -1316,14 +1551,17 @@ function startFishing(tx, ty) {
 }
 
 function pickFish() {
-  const tier = G.save.tools.rod;
+  const s = G.save, tier = s.tools.rod;
   const pool = [];
-  if (G.map && G.map.glow) {
-    // よごれた 水ろ：ネオンスポアで 光る すがたの さかな だけ
+  const sea = G.map && G.map.id === 'sea';
+  if (G.map && G.map.glow && !sea) {
+    // よごれた 水ろ：ネオンスポアで 光る すがたの さかな だけ。2しょうでは さびた はぐるまも しずんで いる
     for (const k of Object.keys(GLOW)) pool.push({ id: `g_${k}`, w: FISH[k].w, spec: FISH[k] });
+    if ((s.ch || 1) >= 2 && !s.fixed.filter && (s.items.m_gear || 0) < GEARS_NEED) pool.push({ id: 'm_gear', w: 45, spec: JUNK.gear });
   } else {
+    // きれいな 水ろ と 海：sea の ついた いきものは 海 だけ
     for (const [k, f] of Object.entries(FISH)) {
-      if (f.tier <= tier) pool.push({ id: `f_${k}`, w: f.tier < tier ? f.w * 0.6 : f.w, spec: f });
+      if (f.tier <= tier && !!f.sea === sea) pool.push({ id: `f_${k}`, w: f.tier < tier ? f.w * 0.6 : f.w, spec: f });
     }
   }
   for (const [k, j] of Object.entries(JUNK)) pool.push({ id: j.item || `j_${k}`, w: j.w, spec: j });
@@ -1441,11 +1679,19 @@ function landFish() {
   persist();
   const first = id[0] === 'g' && !s.flags.glowSeen;
   if (first) s.flags.glowSeen = true;
-  UI.catchCard(id, isNew, first ? () => UI.say([
+  let after = first ? () => UI.say([
     'さかなが {青|あお}く {光|ひか}って いる… ネオンスポアが くっついて いるんだ。',
     'この さかなからは オイルが とれない みたい。',
     'でも、ごうせい そうちに {入|い}れると「あぶらかす」が できるよ。プランターに まくと ひりょうに なる！',
-  ]) : null);
+  ]) : null;
+  if (id === 'm_gear') {
+    const n = s.items.m_gear;
+    after = () => UI.say(n >= GEARS_NEED ? `さびた はぐるまが ${GEARS_NEED}こ そろった！ ろかそうちを {直|なお}しに {行|い}こう。` : `さびた はぐるま ${n}/${GEARS_NEED}。あと ${GEARS_NEED - n}こ！`);
+    UI.hud();
+  }
+  // きれいな 水ろで はじめて つれた さかな：ビデオ07
+  if (id[0] === 'f' && !FISH[id.slice(2)].sea && !s.videos.includes(7)) after = () => playVideo(7);
+  UI.catchCard(id, isNew, after);
 }
 
 // caught：つれた（カットインは すぐ けす）。ちがう ときは さかなが にげる ところを すこし みせる
@@ -1488,20 +1734,23 @@ function openBag() {
         grid.appendChild(c);
       }
       box.appendChild(grid);
-      box.appendChild(el('p', 'help', '<b>もとの すがた</b>（{水|みず}ろが きれいに なると あえる かも）'));
-      grid = el('div', 'dex');
-      for (const [k, f] of Object.entries(FISH)) {
-        const got = s.dex[k];
-        const c = el('div', `dcard${got ? '' : ' unknown'}`);
-        c.innerHTML = rbh(`${iconImg(`f_${k}`, 'ic m')}<div class="nm">${got ? f.name : '？？？'}</div><div class="ds">${got ? `${f.desc}<br>つった かず：${got}` : 'まだ {見|み}た ことが ない'}</div>`);
-        grid.appendChild(c);
+      for (const [sea, title] of [[false, '<b>{水|みず}ろの {魚|さかな}</b>（{水|みず}ろが きれいに なると あえる）'], [true, '<b>{海|うみ}の いきもの</b>（ていぼう から つれる）']]) {
+        box.appendChild(el('p', 'help', title));
+        grid = el('div', 'dex');
+        for (const [k, f] of Object.entries(FISH)) {
+          if (!!f.sea !== sea) continue;
+          const got = s.dex[k];
+          const c = el('div', `dcard${got ? '' : ' unknown'}`);
+          c.innerHTML = rbh(`${iconImg(`f_${k}`, 'ic m')}<div class="nm">${got ? f.name : '？？？'}</div><div class="ds">${got ? `${f.desc}<br>つった かず：${got}` : 'まだ {見|み}た ことが ない'}</div>`);
+          grid.appendChild(c);
+        }
+        box.appendChild(grid);
       }
-      box.appendChild(grid);
       return;
     }
     if (G.bagTab === 'parts') {
       const top = el('div', 'robo');
-      top.innerHTML = `<img class="ic robo-img" src="${robotSpr('down', 0, s.parts, s.flags.awake).toDataURL()}" alt="">
+      top.innerHTML = `<img class="ic robo-img" src="${robotSpr('down', 0, s.parts, s.flags.awake, s.color).toDataURL()}" alt="">
         <p class="help">パーツを つけると ロボが つよく なって、できる ことが ふえるよ。<br>もっと いい パーツは、これから たんけんで みつかるかも！</p>`;
       box.appendChild(top);
       for (const [k, p] of Object.entries(PARTS)) {
@@ -1539,10 +1788,10 @@ function openMap() {
     grid.style.gridTemplateRows = `repeat(${rows}, auto)`;
     grid.appendChild(el('div', 'river'));
     for (const [id, a] of Object.entries(AREAS)) {
-      const open = (s.flags.allOpen || (s.ch || 1) >= a.ch) && a.built;
+      const open = (s.flags.allOpen || ((s.ch || 1) >= a.ch && (!a.flag || s.flags[a.flag]))) && a.built;
       const visited = (s.visited || {})[id] || id === 'out';
       const cls = id === here ? 'here' : open ? (visited ? 'ok' : 'new') : 'lock';
-      const status = id === here ? `🤖 ${escHTML(s.name || 'ロビタ')}が いる` : open ? (visited ? '{行|い}ける' : '{行|い}ける（まだ {行|い}って いない）') : `🔒 ${a.ch}しょうで {行|い}ける`;
+      const status = id === here ? `🤖 ${escHTML(s.name || 'ロビタ')}が いる` : open ? (visited ? '{行|い}ける' : '{行|い}ける（まだ {行|い}って いない）') : a.flag === 'cleanWater' && (s.ch || 1) >= a.ch ? '🔒 ろかそうちを {直|なお}すと {行|い}ける' : `🔒 ${a.ch}しょうで {行|い}ける`;
       const c = el('div', `tcell ${cls}`, `<div class="nm">${a.name}</div><div class="ds">${status}</div><div class="ds sm">${a.note}</div>`);
       c.style.gridColumn = String(a.col + 1);
       c.style.gridRow = String(a.row + 1);
@@ -1605,6 +1854,12 @@ function openMenu() {
         persist();
         UI.closePanel();
       });
+      add('🌅 2しょうを はじめる（1しょう クリア あつかい）', () => {
+        s.flags.ch1done = true;
+        UI.closePanel();
+        if ((s.ch || 1) < 2) startCh2();
+      });
+      add('⚙ さびた はぐるま +3・バリアオイル +1', () => { addItem('m_gear', 3); addItem('o_nanohana'); UI.hud(); persist(); UI.rebuild(); });
       add(G.infinite ? '🔋 でんち むげん：オン' : '🔋 でんち むげん：オフ', () => { G.infinite = !G.infinite; UI.hud(); UI.rebuild(); });
       add('🧹 けんきゅうじょを ぜんぶ かたづける', () => {
         while (s.tidy.stored.length < CLUTTER.length) {
@@ -1639,7 +1894,7 @@ function openMenu() {
 const SHADOW = {
   tree: [24, 6], bush: [15, 4], rock: [12, 3], vend: [30, 4], bin: [28, 4], sign: [9, 3],
   clutter: [12, 3], reed: [6, 2], table: [28, 4], synth: [30, 3], press: [28, 3], charger: [30, 3], bed: [30, 3], wild: [8, 2], scrap: [12, 3],
-  pod: [30, 4], pot: [14, 3], filter: [30, 5],
+  pod: [30, 4], pot: [14, 3], filter: [30, 5], otter: [10, 3], otterWeak: [14, 3],
   deadTree: [12, 3], car: [30, 4], wall: [30, 3], barrel: [9, 3], rubble: [14, 3],
   gate: [14, 3], airTree: [44, 6], bench: [14, 3], boat: [30, 4], stump: [12, 3], crate: [12, 3],
 };
@@ -1748,6 +2003,7 @@ function render() {
     if (!o) drawPlayer(g, ppx, ppy);
     else if (Array.isArray(o)) drawCrop(g, o[0], o[1], o[2]);
     else if (o.t === 'pot') drawPot(g, o);
+    else if (o.t === 'otter') drawSpr(g, SP[Math.sin(G.time * 3 + 1) > 0.7 ? 'otterHop' : 'otter'], o);
     else drawSpr(g, SP[o.spr], o);
   }
   drawSpores(g, m, cx, cy, vw, vh);
@@ -1860,13 +2116,19 @@ function drawPlayer(g, x, y) {
   const f = p.moving ? (p.t < 0.5 ? 1 : 2) : 0;
   const bob = p.moving && p.t >= 0.25 && p.t < 0.75 ? -1 : 0;
   const on = !!G.save.flags.awake;
-  const spr = robotSpr(p.dir, f, G.save.parts, on);
+  const spr = robotSpr(p.dir, f, G.save.parts, on, G.save.color);
   const px = Math.round(x + (T - spr.width) / 2), py = Math.round(y + T - spr.height + 2) + bob;
   g.drawImage(spr, px, py);
   // めの ひかり（ネオン）
   if (on && p.dir !== 'up') {
-    g.fillStyle = `rgba(95,246,255,${0.18 + 0.08 * Math.sin(G.time * 4)})`;
-    g.fillRect(px + (p.dir === 'down' ? 9 : p.dir === 'right' ? 19 : 8), py + 13, p.dir === 'down' ? 16 : 7, 7);
+    // まるい 目の まわりが ふわっと 光る（robotSprite の 目の ばしょ。ふちどりで +1）
+    g.fillStyle = `rgba(95,246,255,${0.16 + 0.08 * Math.sin(G.time * 4)})`;
+    const eyes = p.dir === 'down' ? [13, 22] : p.dir === 'right' ? [22] : [11];
+    for (const ex of eyes) {
+      g.beginPath();
+      g.arc(px + ex, py + 22, 5, 0, Math.PI * 2);
+      g.fill();
+    }
   }
   if (on && G.save.oil < CFG.oilGlow) {
     const many = G.save.oil <= 0 ? 12 : G.save.oil < 25 ? 7 : 4; // へるほど たくさん くっつく
@@ -1880,6 +2142,10 @@ function drawPlayer(g, x, y) {
     const c = CLUTTER.find((q) => q.id === G.save.tidy.carry);
     const cs = SP[`c_${c.kind}`];
     g.drawImage(cs, Math.round(x + (T - cs.width) / 2), py - cs.height + 10);
+  }
+  if (G.save.carryOtter) {
+    const cs = SP.otterWeak;
+    g.drawImage(cs, Math.round(x + (T - cs.width) / 2), py - cs.height + 12);
   }
 }
 

@@ -247,7 +247,11 @@ function scatterRuins(m, seed, n, busy) {
 }
 
 // ふさがった 道（がれきの バリケード と ネオンスポアの きり）。しょうが すすむと なくなる
-const gateOpen = (save, id) => !!(save.flags && save.flags.allOpen) || (save.ch || 1) >= GATES[id].ch;
+// flag の ある 道は、しょうが すすんで いて、その ことを した あと（toSea：ろかそうちを なおす）
+const gateOpen = (save, id) => {
+  const g = GATES[id], f = save.flags || {};
+  return !!f.allOpen || ((save.ch || 1) >= g.ch && (!g.flag || !!f[g.flag]));
+};
 function addGate(m, save, id, cells) {
   if (gateOpen(save, id)) return;
   for (const [x, y] of cells) addObj(m, { t: 'gate', spr: (x + y) % 2 ? 'barricade' : 'barricade2', x, y, solid: true, act: 'gate', gid: id });
@@ -313,7 +317,17 @@ function buildOutside(save) {
   m.doors.push({ x: 16, y: 7, to: 'house', tx: 6, ty: 8, dir: 'up' });
 
   // 水ろの ろかそうち（こわれて いる。2しょうで なおす）
-  addObj(m, { t: 'filter', spr: 'filterBroken', x: 27, y: 5, w: 2, h: 2, solid: true, act: 'filter' });
+  addObj(m, { t: 'filter', spr: save.fixed && save.fixed.filter ? 'filterOk' : 'filterBroken', x: 27, y: 5, w: 2, h: 2, solid: true, act: 'filter' });
+  // 2しょう：きれいに なった 水ろを ながれて きた カワウソ（よわって いる）と、なおった あとの カワウソ
+  // 道がわの きし（すな）で、ys の なかで はじめに あいて いる ところ
+  const bank = (ys) => {
+    for (const y of ys) for (let x = 2; x < W - 2; x++) if (tileAt(m, x, y) === TL.SAND && tileAt(m, x + 1, y) === TL.WATER && !objAt(m, x, y)) return [x, y];
+    return null;
+  };
+  const wb = save.flags.cleanWater && !save.flags.otter && !save.carryOtter && bank([19, 20, 18, 21, 17]);
+  if (wb) addObj(m, { t: 'otterWeak', spr: 'otterWeak', x: wb[0], y: wb[1], solid: true, act: 'otterWeak' });
+  const ob = save.flags.otter && bank([13, 14, 12, 15, 16, 17]);
+  if (ob) addObj(m, { t: 'otter', spr: 'otter', x: ob[0], y: ob[1], solid: true, act: 'otter' });
   // オイル草（とっても CFG.wildRegrow 日 たつと また さく）と、みちの こわれた きかい
   for (const w of WILD) addObj(m, { t: 'wild', spr: wildReady(save, w.id) ? 'wild' : 'wildPicked', x: w.x, y: w.y, solid: true, act: 'wild', wid: w.id });
   for (const sc of SCRAPS) {

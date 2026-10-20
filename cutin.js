@@ -46,7 +46,7 @@ function cutinStart(f) {
   let L = 6, W = 4;
   if (!f.junk) {
     L = [9, 13, 18][s.size - 1] * (s.kind === 'eel' ? 1.4 : 1);
-    W = L * { round: 0.42, thin: 0.24, cat: 0.46, eel: 0.15 }[s.kind];
+    W = L * ({ round: 0.42, thin: 0.24, cat: 0.46, eel: 0.15, crab: 0.7, octo: 0.6 }[s.kind] || 0.42);
   }
   const a0 = Math.random() * Math.PI * 2;
   const d = [Math.cos(a0), Math.sin(a0)];

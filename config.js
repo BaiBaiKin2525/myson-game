@@ -36,6 +36,14 @@ const CH1 = [
   { id: 'pod',     name: 'サイバーか そうち',    energy: 15, mats: { m_screw: 2, m_scrap: 4 }, video: 4 },
 ];
 const POT_SEEDS = { nanohana: 3, turnip: 2 }; // プランターを なおすと もらえる たね
+
+// ---------- 2しょう：ネオン水ろの じょうか と さいしょの 仲間 ----------
+const CH2_SEEDS = { dcarrot: 3, sunflower: 3 };  // 2しょうの はじめに もらえる たね（さびた くわ も）
+const GEARS_NEED = 3;                            // ろかそうちに いる さびた 歯車
+// ろかそうちを なおす：oil は どの バリアオイルでも 1つ
+const FILTER_FIX = { energy: 20, mats: { m_gear: GEARS_NEED, m_screw: 2, m_scrap: 3 }, oil: 1 };
+const OTTER_HEAL = 20;                           // サイバーか そうちで カワウソを なおす 電池
+const OTTER_GIFT = 0.35;                         // えさを あげた つぎの 朝に 魚を おすそわけ して くれる かくりつ
 const KASU_BOOST = 2;                          // ひりょう（あぶらかす）を まくと 水やり 1かいで そだつ 日
 
 // はかせの ビデオ（100年まえの ろくが）。メインパネルで 見なおせる
@@ -69,12 +77,37 @@ const VIDEOS = {
     '{水|みず}ろの「ろかそうち」を {直|なお}せば、きれいな {水|みず}が ながれて くる はずだよ。',
     'つぎの ぼうけんの じゅんびを しよう。たのんだよ、{name}！',
   ] },
+  5: { title: 'ビデオ05「{外|そと}の はたけ」', lines: [
+    'よく ねむれたかい、{name}？ けんきゅう{室|しつ}の きかいが みんな うごいて、ほっと したよ。',
+    'つぎは {外|そと}の はたけだ。どうぐばこに、わたしの {古|ふる}い くわが しまって あるんだ。',
+    'くわで くさを かって、つちを たがやそう。でんきニンジンと ネオンひまわりの たねも つかってね。',
+    'それから、{水|みず}ろの「ろかそうち」。{水|みず}の そこに しずんだ「さびた はぐるま」を 3つ あつめれば、{直|なお}せる はずだよ。',
+  ] },
+  6: { title: 'ビデオ06「きれいな {水|みず}」', lines: [
+    'ろかそうちが うごいたね！ {水|みず}が すきとおって いく…！',
+    'これで けんきゅう{室|しつ}の サイバーか そうちにも、きれいな {水|みず}が とどくよ。',
+    'きれいに なった {水|みず}は、{南|みなみ}の {海|うみ}まで ながれて いく。{水|みず}の いきおいで、{道|みち}を ふさいで いた がれきも ながされた みたいだ。',
+    '{海|うみ}は しお{風|かぜ}が つよいから、バリアオイルを わすれずに！',
+  ] },
+  7: { title: 'ビデオ07「{水|みず}ろの {魚|さかな}」', lines: [
+    'きれいな {水|みず}には、{光|ひか}って いない {魚|さかな}が もどって くるんだ。',
+    'オイルフィッシュは おなかに オイルを ためて いる。しぼりきに {入|い}れれば バリアオイルに なるよ。',
+    'カワウソエビや メダカッチは、どうぶつたちの だいこうぶつ。とって おくと いい ことが あるかも？',
+  ] },
+  8: { title: 'ビデオ08「さいしょの なかま」', lines: [
+    'サイバーか そうちで、どうぶつを なおせたんだね！',
+    'なおった どうぶつは、ことばを {話|はな}せる「サイバーどうぶつ」に なる。ネオンスポアにも まけない からだだ。',
+    'カワウソは {水|みず}あそびが だいすき。{魚|さかな}を あげると、きっと はたけの {水|みず}やりを {手|て}つだって くれるよ。',
+    'なかまが ふえると、{町|まち}は もっと にぎやかに なる。この ちょうしだ、{name}！',
+  ] },
 };
 
 // オイル。しぼりきに さくもつを need こ いれると 1こ できる。oil＝ぬると ふえる りょう
 const OILS = {
   o_nanohana: { name: 'バリアオイル',        from: 'c_nanohana', need: 2, oil: 40, trade: 40 },
   o_goma:     { name: 'ごまの バリアオイル', from: 'c_goma',     need: 2, oil: 60, trade: 80 },
+  o_sun:      { name: 'ひまわりの バリアオイル', from: 'c_sunflower', need: 1, oil: 45, trade: 35 },
+  o_fish:     { name: 'さかなの バリアオイル',   from: 'f_oilfish',   need: 1, oil: 35, trade: 30 },
 };
 
 // そざい（ごうせい そうちから でる）
@@ -82,6 +115,7 @@ const MATS = {
   m_screw: { name: 'ねじ' },
   m_scrap: { name: 'てつくず' },
   m_kasu:  { name: 'あぶらかす', note: 'ひりょうに なる' },
+  m_gear:  { name: 'さびた はぐるま', note: '{水|みず}の そこに しずんで いた。ろかそうちに つかう' },
 };
 
 // ごうせい そうち：いれた ものに よって でる ものが かわる。[でる もの, かくりつ]（のこりは なにも でない）
@@ -94,6 +128,7 @@ const SYNTH = {
   glow:    [['m_kasu', 1]],
 };
 const SYNTH_SEEDS = ['nanohana', 'goma'];
+const SYNTH_SEEDS_CH2 = ['turnip', 'dcarrot', 'sunflower']; // 2しょう から ふえる たね
 const SCREW_PITY = 4;   // こわれた きかいを いれて ねじが でない ことが 4かい つづいたら、つぎは かならず でる
 
 // ロボの パーツ。lv 0 は はじめから ついている ぼろぼろの もの、lv 1 は かたづけで みつかる「ぼろい」パーツ
@@ -118,6 +153,16 @@ const FISH = {
   koi:    { name: 'コイ',     sell: 95,  tier: 2, w: 10, zone: 0.16, hits: 2, speed: 1.35, bite: 0.5, kind: 'round', size: 3, col: ['#e8742a', '#f6e6d0', '#d85a1a'], desc: 'おおきくて ちからもち。' },
   namazu: { name: 'ナマズ',   sell: 150, tier: 2, w: 7,  zone: 0.14, hits: 2, speed: 1.5, bite: 0.45, kind: 'cat',   size: 3, col: ['#4b4f55', '#9aa0a6', '#33373c'], desc: 'ながい ひげの いけの ぬし。' },
   unagi:  { name: 'ウナギ',   sell: 240, tier: 2, w: 4,  zone: 0.12, hits: 3, speed: 1.7, bite: 0.4, kind: 'eel',   size: 3, col: ['#3d3a2e', '#a39a72', '#2e2c22'], desc: 'にょろにょろ。なかなか つれない。' },
+  // しりょうの さかな（きれいに なった 水ろ）
+  medacchi:   { name: 'メダカッチ',     sell: 20, tier: 1, w: 28, zone: 0.26, hits: 1, speed: 1.0, bite: 0.7,  kind: 'round', size: 1, col: ['#7fd6e8', '#e8fcff', '#5ff6ff'], desc: 'きれいに なった {水|みず}に だけ すむ ちいさな {魚|さかな}。むれで キラキラ およぐよ。', love: true },
+  oilfish:    { name: 'オイルフィッシュ', sell: 30, tier: 1, w: 18, zone: 0.22, hits: 1, speed: 1.15, bite: 0.6, kind: 'round', size: 2, col: ['#d8a83a', '#fff0b0', '#a87a1a'], desc: 'おなかに オイルを ためて いる ふしぎな {魚|さかな}。オイル しぼりきで バリアオイルが つくれるよ。' },
+  neonkingyo: { name: 'ネオン{金魚|きんぎょ}', sell: 40, tier: 1, w: 12, zone: 0.2, hits: 1, speed: 1.25, bite: 0.55, kind: 'round', size: 2, col: ['#ff6a8a', '#ffd0dc', '#5ff6ff'], desc: 'ひれが ネオンの ドレスみたいに ひらひら {光|ひか}る {金魚|きんぎょ}。' },
+  kawauebi:   { name: 'カワウソエビ',   sell: 50, tier: 1, w: 10, zone: 0.2, hits: 1, speed: 1.3, bite: 0.5,  kind: 'thin',  size: 1, col: ['#ff8a5a', '#ffd8c0', '#e2502e'], desc: 'サイバーカワウソが いちばん すきな エビ。あげると おおよろこび！', love: true },
+  // 海の いきもの（ていぼう から）
+  aji:  { name: 'ネオンアジ', sell: 20, tier: 1, w: 30, zone: 0.25, hits: 1, speed: 1.1, bite: 0.65, kind: 'round', size: 2, col: ['#7a9ab8', '#e8f4ff', '#5ff6ff'], desc: '{海|うみ}を むれで およぐ。せなかに {青|あお}い {光|ひかり}の すじ。', sea: true },
+  haze: { name: 'ピカハゼ',   sell: 15, tier: 1, w: 26, zone: 0.28, hits: 1, speed: 1.0, bite: 0.7,  kind: 'thin',  size: 1, col: ['#a89a72', '#efe6c8', '#ffd23f'], desc: 'すなの {上|うえ}で じっと して いる。ときどき ピカッと {光|ひか}る。', sea: true },
+  kani: { name: 'エレキガニ', sell: 35, tier: 1, w: 14, zone: 0.22, hits: 1, speed: 1.2, bite: 0.55, kind: 'crab',  size: 2, col: ['#e2392c', '#ffb0a0', '#5ff6ff'], desc: 'はさみから パチパチ {小|ちい}さな {電気|でんき}を だす カニ。', sea: true },
+  tako: { name: 'ネオンダコ', sell: 45, tier: 1, w: 9,  zone: 0.19, hits: 2, speed: 1.3, bite: 0.5,  kind: 'octo',  size: 3, col: ['#b05ac2', '#f0c8f8', '#ff4fd8'], desc: 'からだの いろを ネオンの ように かえる {頭|あたま}の よい タコ。', sea: true },
 };
 // 1しょうの よごれた 水ろで つれる「光る すがた」（ネオンスポアが くっついて いて、オイルは とれない）
 const GLOW = {
@@ -126,6 +171,9 @@ const GLOW = {
   funa:   { col: ['#4f6ad8', '#a8f0ff', '#7dff9a'], desc: 'うろこに ネオンスポアが びっしり。' },
   dojo:   { col: ['#7a5ad8', '#c8b8ff', '#5ff6ff'], desc: 'どろの {中|なか}でも ぼんやり {光|ひか}る。' },
 };
+
+// しりょうの さかな（2しょうで 水ろが きれいに なると つれる）。sea：海の いきもの
+const NEW_FISH = ['medacchi', 'oilfish', 'neonkingyo', 'kawauebi'];
 
 // ごみ。item が ある ものは その もちものに なる（水ぞこの きかいは ごうせい そうちで ねじが でる）
 const JUNK = {
@@ -137,7 +185,9 @@ const JUNK = {
 const CROPS = {
   nanohana: { name: 'オイル{草|くさ}', seed: 15, days: 3, sell: 30 },
   goma:     { name: 'ごま',     seed: 25, days: 5, sell: 55 },
-  turnip:   { name: 'かぶ',     seed: 20, days: 3, sell: 50 },
+  turnip:   { name: 'ライトかぶ', seed: 20, days: 3, sell: 50 },
+  dcarrot:  { name: 'でんきニンジン', seed: 20, days: 4, sell: 40 }, // 2しょう〜
+  sunflower:{ name: 'ネオンひまわり', seed: 20, days: 5, sell: 35 }, // 2しょう〜。1つで バリアオイル
   carrot:   { name: 'にんじん', seed: 35, days: 4, sell: 85 },
   tomato:   { name: 'トマト',   seed: 60, days: 6, sell: 170 },
   pumpkin:  { name: 'かぼちゃ', seed: 110, days: 8, sell: 340 },
@@ -207,12 +257,12 @@ const AREAS = {
   plaza:   { name: 'ちゅうおう {広場|ひろば}',     col: 0, row: 1, ch: 3, built: true,  note: '{空気|くうき}じょうか ツリー・かじゅえん（4しょう）' },
   shop:    { name: 'ネオン しょう{店|てん}がい',   col: 1, row: 1, ch: 3, built: false, note: 'サイバーどうぶつの お{店|みせ}' },
   out:     { name: 'けんきゅう{室|しつ} まわり',   col: 0, row: 2, ch: 1, built: true,  note: 'けんきゅう{室|しつ}・{水|みず}ろ・はたけ' },
-  sea:     { name: '{海|うみ}と みなと',           col: 0, row: 3, ch: 2, built: true,  note: 'かりゅう。しお{風|かぜ}で オイルが へりやすい' },
+  sea:     { name: '{海|うみ}と みなと',           col: 0, row: 3, ch: 2, flag: 'cleanWater', built: true,  note: 'かりゅう。しお{風|かぜ}で オイルが へりやすい' },
 };
 // ふさがった 道（がれきと ネオンスポアの きり）。to の エリアへの 道を ch しょうまで ふさぐ
 const GATES = {
   toPlaza: { to: 'plaza', ch: 3 },
-  toSea:   { to: 'sea',   ch: 2 },
+  toSea:   { to: 'sea',   ch: 2, flag: 'cleanWater' }, // ろかそうちを なおしたら
   toShop:  { to: 'shop',  ch: 3 },
   toMine:  { to: 'mine',  ch: 4 },
 };
