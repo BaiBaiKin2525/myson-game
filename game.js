@@ -70,8 +70,12 @@ function startGame(p) {
   ensureMap('out');
   const pos = G.save.pos;
   const m = ensureMap(pos.map) ? pos.map : 'house';
-  if (walkable(G.maps[m], pos.x, pos.y)) setMap(m, pos.x, pos.y, pos.dir);
-  else setMap('house', 5, 3, 'up');
+  if (!walkable(G.maps[m], pos.x, pos.y)) setMap('house', 5, 3, 'up');
+  else {
+    const [rid, rx, ry, moved] = rescue(m, pos.x, pos.y);
+    setMap(rid, rx, ry, moved ? 'down' : pos.dir);
+    if (moved) setTimeout(() => UI.toast('がれきの むこうから、{道|みち}の ある ところへ もどって きたよ', 3200), 600);
+  }
   $('title').classList.add('hidden');
   $('play').classList.remove('hidden');
   UI.offNote(false);
@@ -560,16 +564,17 @@ function goThrough(door) {
   fadeTo(1, () => {
     const m = ensureMap(door.to);
     const [lx, ly] = landing(m, door.tx, door.ty);
-    setMap(door.to, lx, ly, door.dir);
+    const [rid, rx, ry] = rescue(door.to, lx, ly);
+    setMap(rid, rx, ry, door.dir);
     const s = G.save;
     s.visited = s.visited || {};
-    const first = !s.visited[door.to];
-    s.visited[door.to] = true;
+    const first = !s.visited[rid];
+    s.visited[rid] = true;
     persist();
     fadeTo(0, () => {
       G.busy = false;
-      if (first && AREA_INTRO[door.to]) UI.say(AREA_INTRO[door.to]);
-      if (door.to === 'out' && !G.save.flags.outIntro) {
+      if (first && AREA_INTRO[rid]) UI.say(AREA_INTRO[rid]);
+      if (rid === 'out' && !G.save.flags.outIntro) {
         G.save.flags.outIntro = true;
         persist();
         UI.say([
@@ -583,6 +588,46 @@ function goThrough(door) {
       }
     });
   });
+}
+
+// ---------- ふさがった 道の むこうに とじこめられない ように ----------
+// まえの 版で バリケードを まわりこめて いた とき、もどると がれきの むこうに ついて しまう ことが あった
+
+// その エリアの「もどる ばしょ」：研究室まわりは 研究室の 前、ほかは 研究室まわりへの 出口の まえ
+function homeSpot(m) {
+  if (m.id === 'out') return [16, 8];
+  const d = m.doors.find((x) => x.to === 'out');
+  if (!d) return null;
+  const x = d.x0 != null ? d.x0 : d.x, y = d.y0 != null ? d.y0 : d.y;
+  return landing(m, x, y === 0 ? 1 : y === m.h - 1 ? m.h - 2 : y);
+}
+
+function canReach(m, [sx, sy], tx, ty) {
+  const seen = new Uint8Array(m.w * m.h);
+  const q = [[sx, sy]];
+  seen[sy * m.w + sx] = 1;
+  while (q.length) {
+    const [x, y] = q.pop();
+    if (x === tx && y === ty) return true;
+    for (const [dx, dy] of Object.values(DIRV)) {
+      const nx = x + dx, ny = y + dy;
+      if (!walkable(m, nx, ny) || seen[ny * m.w + nx]) continue;
+      seen[ny * m.w + nx] = 1;
+      q.push([nx, ny]);
+    }
+  }
+  return false;
+}
+
+// [エリア, x, y, うごかしたか]。まだ 入れない エリアに いたら 研究室の 前へ、もどれない ところに いたら もどる ばしょへ
+function rescue(id, x, y) {
+  if (id === 'house') return [id, x, y, false];
+  const gk = Object.keys(GATES).find((k) => GATES[k].to === id);
+  if (gk && !gateOpen(G.save, gk)) return ['out', 16, 8, true];
+  const m = ensureMap(id);
+  const home = m && homeSpot(m);
+  if (home && !canReach(m, home, x, y)) return [id, home[0], home[1], true];
+  return [id, x, y, false];
 }
 
 // はじめて エリアに 入った ときの ことば
