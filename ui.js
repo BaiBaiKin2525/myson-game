@@ -258,7 +258,7 @@ UI.hud = () => {
   $('stBar').style.width = `${Math.round(ratio * 100)}%`;
   $('stamina').classList.toggle('low', !inf && s.stamina < 10);
   $('oilNum').textContent = Math.round(s.oil);
-  $('oilChip').classList.toggle('low', s.oil < 25);
+  $('oilChip').classList.toggle('low', s.oil < CFG.oilGlow);
   $('moneyNum').textContent = s.money;
   $('coinChip').style.display = s.money > 0 ? '' : 'none'; // おかねは 2しょう から（1しょうでは つかわない）
   $('dayNum').textContent = s.day;

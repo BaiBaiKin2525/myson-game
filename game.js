@@ -232,7 +232,8 @@ function useOil(n) {
   const s = G.save;
   const before = s.oil;
   s.oil = Math.max(0, s.oil - n * ((G.map && G.map.oilMul) || 1));
-  if (before >= 25 && s.oil < 25) UI.toast('ギシギシ… バリアオイル🛢が へって、{体|からだ}に ネオンスポアが くっついて きた…', 2800);
+  if (before >= CFG.oilGlow && s.oil < CFG.oilGlow) UI.toast('バリアオイル🛢が へって、{体|からだ}に ネオンスポアが くっついて きた…', 2800);
+  if (before > 0 && s.oil <= 0) UI.toast('ギギギ… オイルが なくなって、うごきが とても おそく なった！ バリアオイルを ぬろう', 3200);
   UI.hud();
 }
 
@@ -422,7 +423,7 @@ function update(dt) {
       p.moving = false;
       p.t = 0;
       useOil(CFG.oil.perStep);
-      if (G.save.oil < 25 && Math.random() < 0.3) Sfx.play('squeak');
+      if (G.save.oil <= 0 && Math.random() < 0.5) Sfx.play('squeak');
       arrived();
     }
   }
@@ -1264,7 +1265,7 @@ function sleep() {
         Sfx.play('morning');
         const lines = [`ピピッ… ${s.day}{日目|にちめ}の {朝|あさ}。スリープ かいじょ！`];
         if (grown) lines.push(`{水|みず}を あげた さくもつが そだったよ！${ready ? `\nしゅうかく できる ものが ${ready}こ あるよ！` : ''}`);
-        if (s.oil < 25) lines.push('ギシギシ… バリアオイル🛢が すくないよ。\nしぼりきで つくって、もちもの🎒から ぬろう！');
+        if (s.oil < CFG.oilGlow) lines.push('バリアオイル🛢が すくないよ。{体|からだ}に ネオンスポアが くっついて いる…\nしぼりきで つくって、もちもの🎒から ぬろう！');
         if (s.stamina < 10 && !unlimitedStamina()) lines.push('{電池|でんち}🔋が すくないね。\n{算数|さんすう}アプリの「じつりょくテスト」で じゅう{電|でん} しよう！');
         UI.say(lines);
       }, 600);
@@ -1575,7 +1576,7 @@ function openMenu() {
       box.appendChild(b);
     };
     box.appendChild(el('p', 'help', `<b>${esc(G.profile.name)}</b> の ロボ「${esc(s.name || 'ロビタ')}」 ・ ${s.day}{日目|にちめ}<br>つった さかな ${s.totals.fish}ひき ・ しゅうかく ${s.totals.harvest}こ`));
-    box.appendChild(el('p', 'help', '🔋 {電池|でんち}は、{算数|さんすう}アプリの「じつりょくテスト」の てんすう ぶん じゅう{電|でん} されるよ。<br>うごいたり、きかいを {直|なお}すと へるよ。スリープ しても ふえないよ。<br>🛢 バリアオイルは うごくと へって、すくないと ネオンスポアが くっついて うごきが おそく なるよ。しぼりきで つくって ぬろう。'));
+    box.appendChild(el('p', 'help', '🔋 {電池|でんち}は、{算数|さんすう}アプリの「じつりょくテスト」の てんすう ぶん じゅう{電|でん} されるよ。<br>うごいたり、きかいを {直|なお}すと へるよ。スリープ しても ふえないよ。<br>🛢 バリアオイルは うごくと へるよ。はんぶんより すくないと {体|からだ}に ネオンスポアが くっついて {光|ひか}り、なくなると うごきが とても おそく なるよ。しぼりきで つくって ぬろう。'));
     add(Sfx.mute ? '🔇 おと：なし' : '🔊 おと：あり', () => { Sfx.mute = !Sfx.mute; UI.rebuild(); });
     add('👪 こどもを かえる', () => backToTitle());
     add('🧮 さんすうアプリに もどる', () => {
@@ -1867,8 +1868,8 @@ function drawPlayer(g, x, y) {
     g.fillStyle = `rgba(95,246,255,${0.18 + 0.08 * Math.sin(G.time * 4)})`;
     g.fillRect(px + (p.dir === 'down' ? 9 : p.dir === 'right' ? 19 : 8), py + 13, p.dir === 'down' ? 16 : 7, 7);
   }
-  if (on && G.save.oil < 25) {
-    const many = G.save.oil <= 0 ? 10 : 5;
+  if (on && G.save.oil < CFG.oilGlow) {
+    const many = G.save.oil <= 0 ? 12 : G.save.oil < 25 ? 7 : 4; // へるほど たくさん くっつく
     for (let k = 0; k < many; k++) {
       if (Math.sin(G.time * 6 + k * 1.7) < 0) continue;
       g.fillStyle = k % 2 ? '#7ff8ff' : '#d68aff';
