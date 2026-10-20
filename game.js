@@ -65,6 +65,7 @@ function startGame(p) {
   G.pid = p.id;
   G.profile = p;
   G.save = loadSave(p.id) || newSave();
+  if (G.save.fixed.planter) G.save.tools.hoe = 1;
   G.maps = { house: buildHouse(G.save) };
   bakeGround(G.maps.house);
   ensureMap('out');
@@ -763,8 +764,8 @@ const ACT = {
   boat(o) { UI.say(['こわれた ボート。そこに あなが あいて いる…', '3しょうの メカ{工|こう}ぼうで {直|なお}して もらえる かも。{直|なお}すと {海|うみ}の おきで つりが できるよ！']); },
   signPier() { UI.say('「ていぼう」\nここから {海|うみ}に むかって つりざおを つかおう。'); },
   signFarm() {
-    if ((G.save.ch || 1) >= 2) UI.say('「はたけ」\nくわで くさを かって、つちを たがやそう。\nたねを まいて、{毎日|まいにち} じょうろで {水|みず}を あげよう！');
-    else UI.say('「はたけ」\nいまは ネオンスポアが こくて、はたけに できない…\n（2しょうで ひらくよ。いまは けんきゅう{室|しつ}の プランターで そだてよう）');
+    if (farmOpen()) UI.say('「はたけ」\nくわで くさを かって、つちを たがやそう。\nたねを まいて、{毎日|まいにち} じょうろで {水|みず}を あげよう！');
+    else UI.say('「はたけ」\nくさぼうぼうで、いまは つかえない…\n（けんきゅう{室|しつ}の プランターを {直|なお}すと、くわが もらえるよ）');
   },
   signCanal() { UI.say('「{水|みず}ろ」\n{水|みず}の {前|まえ}で つりざおを つかおう。\nうきが ツンツン した あと、スパッと しずんだら Ⓐ！'); },
 };
@@ -838,11 +839,15 @@ function tryFix(id, after, then) {
   });
 }
 
+// 外の はたけ：プランターを なおすと くわを もらえて つかえる（1しょう から）
+const farmOpen = () => (G.save.ch || 1) >= 2 || !!G.save.fixed.planter;
+
 function fixPots() {
   const s = G.save;
   for (const o of G.maps.house.objs) if (o.t === 'pot') o.spr = 'potOk';
   for (const [k, n] of Object.entries(POT_SEEDS)) s.seeds[k] = (s.seeds[k] || 0) + n;
   s.tools.can = 1;
+  s.tools.hoe = 1;
   if (!s.sel || s.sel === 'rod') s.sel = 'seed:nanohana';
   UI.hotbar();
 }
@@ -879,8 +884,7 @@ function startCh2() {
     Sfx.play('catch');
     UI.say([
       '★ 2しょう「ネオン{水|みず}ろの じょうか」 ★',
-      '{name}は「さびた くわ」と、でんきニンジン・ネオンひまわりの たねを てに いれた！',
-      '{外|そと}の はたけで、くわを えらんで くさの {前|まえ}で Ⓐ！',
+      '{name}は、でんきニンジン と ネオンひまわりの たねを てに いれた！ {外|そと}の はたけで そだてよう。',
       'よごれた {水|みず}ろで つりを すると、さびた はぐるまが つれる ことが あるよ。',
     ]);
   }));
@@ -1357,9 +1361,8 @@ function useItem(tx, ty, o) {
   }
   if (sel === 'rod') return startFishing(tx, ty);
   if (sel === 'net') return UI.say('ちいさな むしあみ。');
-  const farmOpen = G.map.id === 'out' && (G.save.ch || 1) >= 2;
-  if ((sel === 'kasu' || sel === 'can' || sel.startsWith('seed:')) && !farmOpen) {
-    UI.toast((G.save.ch || 1) >= 2 ? 'プランターか、{外|そと}の はたけで つかおう' : 'けんきゅう{室|しつ}の プランターの {前|まえ}で つかおう');
+  if ((sel === 'kasu' || sel === 'can' || sel.startsWith('seed:')) && !(G.map.id === 'out' && farmOpen())) {
+    UI.toast(farmOpen() ? 'プランターか、{外|そと}の はたけで つかおう' : 'けんきゅう{室|しつ}の プランターの {前|まえ}で つかおう');
     return;
   }
   if (G.map.id !== 'out') {
@@ -1420,7 +1423,7 @@ function useHoe(tx, ty, o) {
   Sfx.play('till');
   if (!s.flags.firstTill) {
     s.flags.firstTill = true;
-    UI.toast('たがやした！ おみせで たねを かって まこう', 2600);
+    UI.toast('たがやした！ たねを えらんで まこう。{毎日|まいにち} じょうろで {水|みず}を あげよう', 2600);
   }
   persist();
 }
