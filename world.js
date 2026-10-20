@@ -123,6 +123,9 @@ const wildReady = (save, id) => {
   return d == null || save.day - d >= CFG.wildRegrow;
 };
 
+// おなじ えが ならばない ように いろちがい・はんてんを えらぶ
+const variant = (spr, r) => (spr === 'car' ? ['car', 'car2', 'carB'][(r() * 3) | 0] : spr === 'wallBroken' ? (r() < 0.5 ? 'wallBroken' : 'wall2') : spr);
+
 // 水ろの まんなか（y ごとに すこし まがる）
 const canalX = (y) => 32 + Math.round(Math.sin(y * 0.3) * 2);
 
@@ -131,6 +134,7 @@ function buildOutside(save) {
   const m = newMap('out', W, H);
   m.name = 'そと';
   m.glow = !save.flags.cleanWater; // ネオンスポアで よごれて 光って いる（2しょうで きれいに なる）
+  m.ruin = !save.flags.airClean;   // 100年 だれも いない あれた 町（4しょうの 空気じょうか ツリーで みどりが もどる よてい）
   const r = RNG(2024);
   for (let i = 0; i < W * H; i++) m.v[i] = (r() * 4) | 0;
 
@@ -153,17 +157,41 @@ function buildOutside(save) {
   for (let y = 10; y <= 11; y++) path(9, y);
   for (let x = 13; x <= 15; x++) path(x, 8);
 
-  // まわりの もり（とおれない）
+  // まわりは くずれた ビルと がれき（とおれない）
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      const ring = x < 2 || y < 2 || x >= W - 2 || y >= H - 2;
-      if (!ring) continue;
+      if (!(x < 2 || y < 2 || x >= W - 2 || y >= H - 2)) continue;
       m.tsolid[y * W + x] = 1;
       refreshCell(m, y * W + x);
-      if ((x + y) % 2 === 0 && m.tiles[y * W + x] !== TL.WATER) {
-        const k = (x * 7 + y * 3) % 5;
-        addObj(m, { t: 'tree', spr: k === 0 ? 'pine' : k % 2 ? 'tree' : 'tree2', x, y });
-      }
+    }
+  }
+  const er = RNG(55);
+  const dry = (x0, x1, y) => { for (let x = x0; x <= x1; x++) if (tileAt(m, x, y) === TL.WATER || tileAt(m, x, y) === TL.SAND) return false; return true; };
+  // きた：ビルが ならぶ
+  for (let x = 0; x < W;) {
+    const tall = er() < 0.6;
+    const w = tall ? 3 : 2;
+    if (!dry(x, x + w - 1, 1) || !dry(x, x + w - 1, 0)) { x++; continue; }
+    addObj(m, { t: 'ruinB', spr: tall ? `tower${1 + ((er() * 3) | 0)}` : `shop${1 + ((er() * 2) | 0)}`, x, y: 1, w, h: 1, act: 'look' });
+    x += w + (er() < 0.25 ? 1 : 0);
+  }
+  // みなみ：くずれた かべ・はいしゃ・がれき
+  for (let x = 0; x < W;) {
+    const k = er();
+    const spr = k < 0.35 ? 'wallBroken' : k < 0.55 ? 'car' : k < 0.8 ? 'rubbleBig' : 'deadTree';
+    const w = spr === 'deadTree' ? 1 : 2;
+    if (!dry(x, x + w - 1, H - 2)) { x++; continue; }
+    addObj(m, { t: { wallBroken: 'wall', car: 'car', rubbleBig: 'rubble', deadTree: 'deadTree' }[spr], spr: variant(spr, er), x, y: H - 2, w, h: 1, act: 'look' });
+    x += w + (er() < 0.4 ? 1 : 0);
+  }
+  // にし と ひがし：ひくい ビル・かれ木・がれき・ドラムかん
+  for (const x of [0, W - 2]) {
+    for (let y = 3; y < H - 3;) {
+      const k = er();
+      if (k < 0.4 && dry(x, x + 1, y)) { addObj(m, { t: 'ruinB', spr: `shop${1 + ((er() * 2) | 0)}`, x, y, w: 2, h: 1, act: 'look' }); y += 3; continue; }
+      const spr = k < 0.6 ? 'deadTree' : k < 0.85 ? 'rubble' : 'barrel';
+      addObj(m, { t: spr === 'rubble' ? 'rubble' : spr, spr, x: x + (er() < 0.5 ? 0 : 1), y, act: 'look' });
+      y += 2;
     }
   }
 
@@ -201,7 +229,7 @@ function buildOutside(save) {
       const key = `${x},${y}`;
       if (cleared.has(key) || save.plots[key]) continue;
       if (n < 0.07) addObj(m, { t: 'rock', spr: 'rock', x, y, solid: true, key });
-      else if (n < 0.62) addObj(m, { t: 'weed', spr: 'weed', x, y, key });
+      else if (n < 0.62) addObj(m, { t: 'weed', spr: m.ruin ? 'weedDry' : 'weed', x, y, key });
     }
   }
 
@@ -214,7 +242,7 @@ function buildOutside(save) {
       if (tileAt(m, x, y) === TL.SAND && around.includes(TL.WATER) && !objAt(m, x, y) && Math.abs(y - 9) > 2) shore.push([x, y]);
     }
   }
-  for (let k = 0; k < 6 && shore.length; k++) {
+  for (let k = 0; k < (m.ruin ? 3 : 6) && shore.length; k++) {
     const [x, y] = shore.splice((lr() * shore.length) | 0, 1)[0];
     addObj(m, { t: 'reed', spr: 'reed', x, y });
   }
@@ -232,21 +260,34 @@ function buildOutside(save) {
     return !!objAt(m, x, y);
   };
   const tr = RNG(9);
+  // みちの こわれた がいとう
+  if (m.ruin) for (const [x, y] of [[22, 8], [27, 10], [12, 10], [18, 8]]) if (!objAt(m, x, y)) addObj(m, { t: 'lamp', spr: 'lampOff', x, y, solid: true, act: 'look' });
   let trees = 0;
-  for (let k = 0; k < 400 && trees < 26; k++) {
+  for (let k = 0; k < 500 && trees < (m.ruin ? 24 : 26); k++) {
     const x = 2 + ((tr() * (W - 4)) | 0);
     const y = 2 + ((tr() * (H - 4)) | 0);
     if (busy(x, y)) continue;
     const kind = tr();
-    if (kind < 0.55) addObj(m, { t: 'tree', spr: kind < 0.15 ? 'pine' : kind < 0.35 ? 'tree' : 'tree2', x, y, solid: true });
+    if (m.ruin) {
+      // かれ木・がれき・はいしゃ・ドラムかん・くずれた かべ。みどりの 木は ほんの すこし
+      const spr = kind < 0.28 ? 'deadTree' : kind < 0.5 ? 'rubble' : kind < 0.62 ? 'car' : kind < 0.76 ? 'barrel' : kind < 0.88 ? 'wallBroken' : kind < 0.95 ? 'rubbleBig' : 'bush2';
+      const w = ['car', 'wallBroken', 'rubbleBig'].includes(spr) ? 2 : 1;
+      if (w === 2 && busy(x + 1, y)) continue;
+      const t = { deadTree: 'deadTree', rubble: 'rubble', rubbleBig: 'rubble', car: 'car', barrel: 'barrel', wallBroken: 'wall', bush2: 'bush' }[spr];
+      addObj(m, { t, spr: variant(spr, tr), x, y, w, h: 1, solid: true, act: t === 'bush' ? undefined : 'look' });
+    } else if (kind < 0.55) addObj(m, { t: 'tree', spr: kind < 0.15 ? 'pine' : kind < 0.35 ? 'tree' : 'tree2', x, y, solid: true });
     else addObj(m, { t: 'bush', spr: kind < 0.8 ? 'bush' : 'bush2', x, y, solid: true });
     trees++;
   }
-  for (let k = 0; k < 60; k++) {
+  for (let k = 0; k < 70; k++) {
     const x = 2 + ((tr() * (W - 4)) | 0);
     const y = 2 + ((tr() * (H - 4)) | 0);
-    if (tileAt(m, x, y) !== TL.GRASS || objAt(m, x, y) || inFarm(x, y)) continue;
-    addObj(m, { t: 'deco', spr: tr() < 0.5 ? 'flowerA' : 'flowerB', x, y, flat: true });
+    if (tileAt(m, x, y) === TL.WATER || objAt(m, x, y) || inFarm(x, y)) continue;
+    const f = tr();
+    // あれた 町は ごみが ちらばり、はなは ほんの すこし
+    const spr = m.ruin ? (f < 0.9 ? (f < 0.45 ? 'debris' : 'debris2') : f < 0.95 ? 'flowerA' : 'flowerB') : f < 0.5 ? 'flowerA' : 'flowerB';
+    if (spr.startsWith('flower') && tileAt(m, x, y) !== TL.GRASS) continue;
+    addObj(m, { t: 'deco', spr, x, y, flat: true });
   }
   return m;
 }

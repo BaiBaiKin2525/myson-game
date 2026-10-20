@@ -105,7 +105,7 @@ function leaf(g, x, y, len, dir, c1, c2) {
 const GROUND_CACHE = {};
 
 function bakeGround(m) {
-  const key = m.id + (m.glow ? ':glow' : '');
+  const key = m.id + (m.glow ? ':glow' : '') + (m.ruin ? ':ruin' : '');
   if (GROUND_CACHE[key]) {
     m.ground = GROUND_CACHE[key];
     return;
@@ -161,12 +161,15 @@ function bakeOutside(m, g) {
     const at = (xx, yy) => a[Math.max(0, Math.min(m.h - 1, yy)) * m.w + Math.max(0, Math.min(m.w - 1, xx))];
     return (at(x0, y0) * (1 - u) + at(x0 + 1, y0) * u) * (1 - v) + (at(x0, y0 + 1) * (1 - u) + at(x0 + 1, y0 + 1) * u) * v;
   };
-  const GR = ['#4a8f34', '#589f3c', '#68b246', '#78c050', '#8ccf5c'].map(hexRGB);
-  const PA = ['#a77b4a', '#b98d58', '#c99f68', '#d8b27a', '#e3c38c'].map(hexRGB);
-  const SA = ['#d4b77e', '#e1c992', '#ebd8a6', '#f3e4b8'].map(hexRGB);
+  // あれはてた 町（m.ruin）：かれくさ・むきだしの つち・ひびわれた アスファルト・コンクリートの きし
+  const GR = (m.ruin ? ['#3a392c', '#454332', '#514e38', '#5c583f', '#676147'] : ['#4a8f34', '#589f3c', '#68b246', '#78c050', '#8ccf5c']).map(hexRGB);
+  const DI = ['#3e362f', '#4a4038', '#55493f', '#615446', '#6b5e4e'].map(hexRGB);
+  const PA = (m.ruin ? ['#2e3034', '#36383c', '#3e4045', '#46484d', '#4e5055'] : ['#a77b4a', '#b98d58', '#c99f68', '#d8b27a', '#e3c38c']).map(hexRGB);
+  const SA = (m.ruin ? ['#5e5c58', '#696762', '#74726c', '#7f7d77'] : ['#d4b77e', '#e1c992', '#ebd8a6', '#f3e4b8']).map(hexRGB);
   // ネオンスポアで よごれた 水は むらさきと みずいろに 光る
   const WA = (m.glow ? ['#1c1450', '#2a1f78', '#33309c', '#3a52b8', '#3f86d0', '#5fd8ea'] : ['#2a6aa6', '#3179b6', '#3b8ac4', '#4c9fd2', '#62b5df', '#7fcbe8']).map(hexRGB);
-  const FOAM = hexRGB(m.glow ? '#d68aff' : '#c6eaf4'), WET = hexRGB(m.glow ? '#8f7a9a' : '#c2a46e'), EDGE = hexRGB('#946a3e');
+  const FOAM = hexRGB(m.glow ? '#d68aff' : '#c6eaf4'), WET = hexRGB(m.glow ? (m.ruin ? '#4a4656' : '#8f7a9a') : '#c2a46e'), EDGE = hexRGB(m.ruin ? '#66645e' : '#946a3e');
+  const SEAM = hexRGB('#4a4844');
   const img = g.createImageData(W, H), a = img.data;
   for (let py = 0; py < H; py++) {
     for (let px = 0; px < W; px++) {
@@ -181,6 +184,7 @@ function bakeOutside(m, g) {
         if (wv < 0.6 && (BAYER[py & 3][px & 3] > 5 || wv < 0.54)) col = FOAM;
       } else if (samp(sM, x, y) + nz * 0.1 > 0.5) {
         col = wv > 0.42 ? WET : pickTone(SA, fbm(x * 3, y * 3) - 0.15 + dth * 0.3);
+        if (m.ruin && wv <= 0.42 && ((px % 16) === 0 || (py % 12) === 0)) col = SEAM; // コンクリートの つなぎめ
       } else {
         const pv = samp(pM, x, y) + nz * 0.16;
         if (pv > 0.5) {
@@ -190,6 +194,8 @@ function bakeOutside(m, g) {
           t -= samp(ring, x, y) * 0.35;           // もりの なかは くらい
           if (samp(sM, x, y) > 0.2) t -= 0.12;     // すなはまの まわりは すこし こい
           col = pickTone(GR, t);
+          // くさが はげて つちが むきだしに なった ところ
+          if (m.ruin && vnoise(x * 0.45 + 3, y * 0.45) + nz * 0.3 < 0.45) col = pickTone(DI, fbm(x * 2.5, y * 2.5) * 1.1 - 0.05 + dth * 0.25);
         }
       }
       const i = (py * W + px) * 4;
@@ -202,24 +208,44 @@ function bakeOutside(m, g) {
   g.putImageData(img, 0, 0);
   const tileAtPx = (px, py) => m.tiles[Math.floor(py / T) * m.w + Math.floor(px / T)];
   const r = RNG(5);
-  // くさの たば
-  for (let k = 0; k < (W * H) / 260; k++) {
+  // あれた 町：アスファルトの ひび・きえかけた せんの もよう・ちらばる ガラス
+  if (m.ruin) {
+    for (let k = 0; k < (W * H) / 900; k++) {
+      let px = (r() * W) | 0, py = (r() * H) | 0;
+      if (tileAtPx(px, py) === TL.WATER) continue;
+      const col = tileAtPx(px, py) === TL.PATH ? '#1e2024' : '#2e2a24';
+      for (let i = 0; i < 6 + r() * 18; i++) {
+        R(g, col, px, py, 1, 1);
+        px += r() < 0.5 ? 1 : -1 + ((r() * 2) | 0);
+        py += r() < 0.6 ? 1 : 0;
+      }
+    }
+    for (let y = 0; y < m.h; y++) {
+      for (let x = 0; x < m.w; x++) {
+        if (m.tiles[y * m.w + x] !== TL.PATH || (x + y) % 2) continue;
+        const left = m.tiles[y * m.w + x - 1] === TL.PATH, right = m.tiles[y * m.w + x + 1] === TL.PATH;
+        if (left && right && r() < 0.7) R(g, r() < 0.5 ? '#7a6a3a' : '#5e543a', x * T + 6, y * T + 15, 14, 2);
+      }
+    }
+  }
+  // くさの たば（あれた 町では すくなくて かれた いろ）
+  for (let k = 0; k < (W * H) / (m.ruin ? 700 : 260); k++) {
     const px = (r() * W) | 0, py = (r() * H) | 0;
     if (tileAtPx(px, py) !== TL.GRASS) continue;
     const dark = r() < 0.6;
-    const c1 = dark ? '#3f7e2c' : '#9ad968';
+    const c1 = m.ruin ? (dark ? '#3e3a26' : '#8e8458') : dark ? '#3f7e2c' : '#9ad968';
     R(g, c1, px, py, 1, 2);
     R(g, c1, px - 2, py + 1, 1, 2);
     R(g, c1, px + 2, py + 1, 1, 2);
-    if (dark) R(g, '#7cc356', px, py - 1, 1, 1);
+    if (dark) R(g, m.ruin ? '#6e6844' : '#7cc356', px, py - 1, 1, 1);
   }
   // こいし
   for (let k = 0; k < (W * H) / 1800; k++) {
     const px = (r() * W) | 0, py = (r() * H) | 0;
     const t = tileAtPx(px, py);
     if (t !== TL.PATH && t !== TL.SAND) continue;
-    R(g, '#8f6a42', px, py + 1, 2, 1);
-    R(g, '#efd6a6', px, py, 2, 1);
+    R(g, m.ruin ? '#2a2a2e' : '#8f6a42', px, py + 1, 2, 1);
+    R(g, m.ruin ? '#8a8a86' : '#efd6a6', px, py, 2, 1);
   }
 }
 
@@ -2079,10 +2105,274 @@ function buildCh1() {
   });
 }
 
+// ---------- あれはてた 町（くずれた ビル・がれき・はいしゃ・かれ木） ----------
+
+// まどの いろいろ（われた・くらい・いたで ふさいだ・ネオンが すこし のこる）
+function ruinWindow(g, x, y, w, h, kind) {
+  R(g, '#26272c', x - 1, y - 1, w + 2, h + 2);
+  if (kind === 0) { // われて まっくら
+    R(g, '#0e0f12', x, y, w, h);
+    R(g, '#5a6a7a', x + 1, y + 1, 2, 1);
+    R(g, '#5a6a7a', x + w - 3, y + h - 2, 2, 1);
+    for (let i = 0; i < Math.min(w, h) - 2; i++) R(g, '#3a4a5a', x + 2 + i, y + 1 + (i >> 1), 1, 1);
+  } else if (kind === 1) { // くらい ガラス
+    R(g, '#2c3a48', x, y, w, h);
+    R(g, '#3e5062', x, y, w, 2);
+    R(g, '#4a6074', x + 1, y + 1, 2, 2);
+  } else if (kind === 2) { // いたで ふさいだ
+    R(g, '#0e0f12', x, y, w, h);
+    R(g, '#6e5a42', x - 1, y + 2, w + 2, 2);
+    R(g, '#5e4a34', x - 1, y + h - 4, w + 2, 2);
+  } else { // ネオンが すこし のこる
+    R(g, '#0e0f12', x, y, w, h);
+    R(g, kind === 3 ? 'rgba(95,246,255,.55)' : 'rgba(255,79,216,.5)', x + 1, y + 1, w - 2, h - 2);
+    R(g, kind === 3 ? '#9ff8ff' : '#ff9ae8', x + 1, y + 1, w - 2, 1);
+  }
+}
+
+// ひび（ジグザグ）
+function crack(g, x, y, len, r, col = '#2a2b2e') {
+  let cx = x, cy = y;
+  for (let i = 0; i < len; i++) {
+    R(g, col, cx, cy, 1, 1);
+    cx += r() < 0.5 ? 1 : 0;
+    cy += r() < 0.7 ? 1 : 0;
+    if (r() < 0.15) cx -= 1;
+  }
+}
+
+// ネオンスポアが くっついて 光る コケ
+function sporeMoss(g, r, x0, y0, w, h, n) {
+  for (let i = 0; i < n; i++) {
+    const x = x0 + ((r() * w) | 0), y = y0 + ((r() * h) | 0);
+    R(g, r() < 0.5 ? '#3f86a0' : '#6a4a8a', x, y, 2, 2);
+    R(g, r() < 0.5 ? '#7ff8ff' : '#d68aff', x, y, 1, 1);
+  }
+}
+
+// こわれた ビル（たかい）。seed ごとに まどや くずれかたが かわる
+function ruinTower(seed) {
+  return osp(96, 132, (g) => {
+    const r = RNG(seed);
+    R(g, '#4c4d53', 4, 14, 88, 118);
+    R(g, '#5a5b61', 4, 14, 64, 118);
+    R(g, '#3e3f45', 80, 14, 12, 118);              // みぎの かげ
+    for (let y = 30; y < 118; y += 20) {          // かいの さかいめ
+      R(g, '#6a6b70', 4, y, 88, 1);
+      R(g, '#35363b', 4, y + 1, 88, 1);
+    }
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 4; col++) {
+        const v = r();
+        const kind = v < 0.4 ? 0 : v < 0.65 ? 1 : v < 0.85 ? 2 : v < 0.93 ? 3 : 4;
+        ruinWindow(g, 12 + col * 20, 34 + row * 20, 11, 10, kind);
+      }
+    }
+    // 1かい：さびた シャッター
+    R(g, '#26272c', 16, 118, 40, 14);
+    for (let y = 119; y < 132; y += 2) R(g, y % 4 ? '#6a5a4e' : '#5a4a3e', 17, y, 38, 1);
+    R(g, '#8a4a2a', 22, 124, 6, 3);
+    R(g, '#8a4a2a', 40, 127, 8, 2);
+    // くずれた うえ と てっきん
+    g.globalCompositeOperation = 'destination-out';
+    g.beginPath();
+    g.moveTo(52, 0);
+    let x = 52;
+    while (x < 96) {
+      x += 4 + r() * 6;
+      g.lineTo(x, 14 + r() * 26);
+    }
+    g.lineTo(96, 0);
+    g.closePath();
+    g.fill();
+    g.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 6; i++) {
+      const bx = 56 + ((r() * 34) | 0), by = 18 + ((r() * 18) | 0);
+      for (let k = 0; k < 8; k++) R(g, '#8a5a3a', bx + (k >> 2), by - k, 1, 1);
+    }
+    R(g, '#6a6b70', 4, 14, 50, 2);
+    // ひび と ネオンの かんばん（はんぶん きえて いる）
+    for (let i = 0; i < 5; i++) crack(g, 6 + ((r() * 80) | 0), 20 + ((r() * 90) | 0), 10 + ((r() * 14) | 0), r);
+    R(g, '#1a1a22', 0, 44, 9, 52);
+    for (let k = 0; k < 6; k++) {
+      const on = r() < 0.6;
+      R(g, on ? '#ff4fd8' : '#4a2a44', 2, 48 + k * 8, 5, 5);
+      if (on) R(g, '#ffc0f0', 3, 49 + k * 8, 3, 1);
+    }
+    // でんせん
+    for (let x2 = 0; x2 < 30; x2++) R(g, '#1a1a1e', 60 + x2, 60 + Math.round(Math.sin(x2 / 30 * Math.PI) * 8), 1, 1);
+    sporeMoss(g, r, 6, 96, 80, 34, 22);
+  }, '#121216');
+}
+
+// ひくい みせの あと（シャッターと やぶれた テント）
+function ruinShop(seed) {
+  return osp(64, 92, (g) => {
+    const r = RNG(seed);
+    R(g, '#55565c', 2, 12, 60, 80);
+    R(g, '#45464c', 50, 12, 12, 80);
+    R(g, '#6a6b70', 2, 12, 60, 2);
+    ruinWindow(g, 8, 22, 14, 12, r() < 0.5 ? 0 : 2);
+    ruinWindow(g, 34, 22, 14, 12, r() < 0.5 ? 1 : 3);
+    // やぶれた テント
+    const tc = r() < 0.5 ? ['#2a8a8a', '#1f6a6a'] : ['#8a3a7a', '#6a2a5e'];
+    for (let x = 2; x < 62; x += 6) {
+      const h = 8 + ((r() * 6) | 0);
+      R(g, (x / 6) % 2 ? tc[0] : tc[1], x, 42, 6, h);
+    }
+    R(g, '#3e3f45', 2, 41, 60, 2);
+    // シャッター
+    R(g, '#26272c', 6, 58, 48, 34);
+    for (let y = 59; y < 92; y += 2) R(g, y % 4 ? '#6a5a4e' : '#5a4a3e', 7, y, 46, 1);
+    for (let i = 0; i < 4; i++) R(g, '#8a4a2a', 10 + ((r() * 36) | 0), 62 + ((r() * 26) | 0), 4 + ((r() * 5) | 0), 2);
+    // かんばん（もじは かすれて よめない）
+    R(g, '#1a1a22', 10, 2, 44, 10);
+    for (let k = 0; k < 5; k++) R(g, r() < 0.5 ? '#5ff6ff' : '#2a4a50', 14 + k * 8, 4, 5, 6);
+    for (let i = 0; i < 3; i++) crack(g, 4 + ((r() * 50) | 0), 14 + ((r() * 30) | 0), 10, r);
+    sporeMoss(g, r, 4, 70, 56, 20, 12);
+  }, '#121216');
+}
+
+function buildRuins() {
+  SP.tower1 = ruinTower(11);
+  SP.tower2 = ruinTower(23);
+  SP.tower3 = ruinTower(37);
+  SP.shop1 = ruinShop(5);
+  SP.shop2 = ruinShop(8);
+  // がれき
+  const rubble = (seed, w, h) => osp(w, h, (g) => {
+    const r = RNG(seed);
+    for (let i = 0; i < Math.round(w * h / 90); i++) {
+      const cx = 4 + ((r() * (w - 8)) | 0), cy = Math.round(h * 0.45 + r() * h * 0.45);
+      const rw = 3 + ((r() * w * 0.14) | 0), rh = 2 + ((r() * h * 0.16) | 0);
+      E(g, '#4a4b50', cx + 1, cy + 1, rw, rh);
+      E(g, r() < 0.5 ? '#6e6f74' : '#7e7f84', cx, cy, rw, rh);
+      R(g, '#9a9ba0', cx - rw + 1, cy - rh + 1, Math.max(1, rw - 1), 1);
+    }
+    for (let i = 0; i < 3; i++) {
+      const bx = 6 + ((r() * (w - 12)) | 0), by = Math.round(h * 0.5 + r() * h * 0.3);
+      for (let k = 0; k < 7; k++) R(g, '#8a5a3a', bx + (k > 3 ? 1 : 0), by - k, 1, 1);
+    }
+  }, '#1e1e22');
+  SP.rubble = rubble(3, 34, 26);
+  SP.rubbleBig = rubble(9, 64, 40);
+  // はいしゃ（さびた くるま）
+  SP.car = osp(64, 38, (g) => {
+    const r = RNG(4);
+    R(g, '#2a2a2e', 4, 30, 56, 6);
+    R(g, '#7a3a2e', 2, 16, 60, 16);
+    R(g, '#8e4a38', 2, 16, 60, 3);
+    R(g, '#5a2a20', 2, 28, 60, 4);
+    R(g, '#6a3428', 14, 4, 34, 14);
+    R(g, '#0e0f12', 17, 6, 12, 10);
+    R(g, '#0e0f12', 32, 6, 13, 10);
+    R(g, '#5a6a7a', 19, 7, 2, 1);
+    for (const x of [8, 46]) { E(g, '#1a1a1e', x + 5, 32, 6, 4); E(g, '#4a4a50', x + 5, 32, 3, 2); }
+    for (let i = 0; i < 9; i++) R(g, r() < 0.5 ? '#a8582e' : '#4a2018', 4 + ((r() * 54) | 0), 18 + ((r() * 12) | 0), 2 + ((r() * 4) | 0), 1 + ((r() * 2) | 0));
+    R(g, '#ffd23f', 56, 20, 4, 3);
+    R(g, '#5a4a20', 56, 20, 4, 1);
+    sporeMoss(g, r, 4, 20, 56, 12, 8);
+  }, '#121216');
+  // かれ木
+  SP.deadTree = osp(44, 78, (g) => {
+    const r = RNG(6);
+    R(g, '#4e4238', 19, 34, 7, 44);
+    R(g, '#3a3028', 19, 34, 2, 44);
+    R(g, '#5e5246', 24, 36, 1, 40);
+    R(g, '#4e4238', 15, 74, 15, 4);
+    const branch = (x, y, dx, len) => {
+      let cx = x, cy = y;
+      for (let i = 0; i < len; i++) {
+        R(g, '#4e4238', Math.round(cx), Math.round(cy), 2, 2);
+        cx += dx;
+        cy -= 1;
+        if (i === (len >> 1)) for (let k = 0; k < 5; k++) R(g, '#4e4238', Math.round(cx) + (dx > 0 ? -k : k), Math.round(cy) - k, 1, 1);
+      }
+    };
+    branch(21, 40, -0.9, 18);
+    branch(23, 36, 0.8, 20);
+    branch(22, 34, 0.1, 24);
+    branch(21, 50, -1.2, 10);
+    branch(24, 46, 1.1, 12);
+    sporeMoss(g, r, 18, 52, 8, 20, 5);
+  }, '#1a1612');
+  // ドラムかん
+  SP.barrel = osp(22, 28, (g) => {
+    const r = RNG(2);
+    R(g, '#6a4a32', 2, 4, 18, 24);
+    R(g, '#8a5e3e', 2, 4, 6, 24);
+    R(g, '#4a3222', 16, 4, 4, 24);
+    R(g, '#3a3a3e', 2, 10, 18, 2);
+    R(g, '#3a3a3e', 2, 20, 18, 2);
+    E(g, '#4a3222', 11, 4, 9, 2);
+    E(g, '#2a2a2e', 11, 4, 7, 1);
+    for (let i = 0; i < 5; i++) R(g, '#a8582e', 3 + ((r() * 15) | 0), 6 + ((r() * 20) | 0), 2, 2);
+    R(g, '#ffd23f', 8, 14, 6, 4);
+    R(g, '#1a1a1e', 10, 15, 2, 2);
+  }, '#121216');
+  // くずれた コンクリートの かべ（ネオンの らくがき）
+  SP.wallBroken = osp(64, 44, (g) => {
+    const r = RNG(12);
+    R(g, '#5e5f64', 0, 10, 64, 34);
+    R(g, '#4a4b50', 0, 38, 64, 6);
+    for (let x = 0; x < 64; x += 16) R(g, '#4e4f54', x, 10, 1, 34);
+    for (let y = 18; y < 40; y += 8) R(g, '#4e4f54', 0, y, 64, 1);
+    g.globalCompositeOperation = 'destination-out';
+    g.beginPath();
+    g.moveTo(0, 0);
+    for (let x = 0; x <= 64; x += 6) g.lineTo(x, 10 + r() * 16);
+    g.lineTo(64, 0);
+    g.closePath();
+    g.fill();
+    g.globalCompositeOperation = 'source-over';
+    R(g, '#8a4a3a', 40, 24, 10, 6);           // なかの レンガ
+    R(g, '#6a3a2e', 40, 27, 10, 1);
+    for (let i = 0; i < 18; i++) R(g, '#ff4fd8', 8 + i, 30 + Math.round(Math.sin(i * 0.7) * 3), 1, 2);
+    for (let i = 0; i < 10; i++) R(g, '#5ff6ff', 26 + i, 34 - (i >> 1), 2, 1);
+    crack(g, 20, 14, 18, r);
+  }, '#121216');
+  // ちらかった ごみ（じめんに はりつく）
+  SP.debris = make(32, 32, (g) => {
+    const r = RNG(17);
+    for (let i = 0; i < 6; i++) {
+      const x = 3 + ((r() * 24) | 0), y = 4 + ((r() * 24) | 0);
+      const k = r();
+      if (k < 0.3) { R(g, '#8a8a84', x, y, 4, 2); R(g, '#a8a8a2', x, y, 4, 1); }          // かみくず
+      else if (k < 0.55) { R(g, '#6a7a8a', x, y, 2, 2); R(g, '#bfe6f2', x, y, 1, 1); }    // ガラス
+      else if (k < 0.8) { R(g, '#5a4a3e', x, y, 5, 1); R(g, '#3a3028', x + 1, y + 1, 3, 1); } // はへん
+      else { R(g, '#3f86a0', x, y, 2, 2); R(g, '#7ff8ff', x, y, 1, 1); }                  // 光る コケ
+    }
+  });
+  SP.debris2 = flipX(SP.debris);
+  // おなじ ものが ならばない ように、いろちがい・はんてん
+  SP.car2 = make(SP.car.width, SP.car.height, (g) => {
+    g.drawImage(SP.car, 0, 0);
+    const img = g.getImageData(0, 0, SP.car.width, SP.car.height), d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const [r0, g0, b0] = [d[i], d[i + 1], d[i + 2]];
+      if (d[i + 3] && r0 > g0 + 20 && r0 > b0 + 20) { d[i] = r0 * 0.45; d[i + 1] = g0 * 0.9 + 30; d[i + 2] = b0 * 1.1 + 40; } // さびた あか → いろあせた あお
+    }
+    g.putImageData(img, 0, 0);
+  });
+  SP.carB = flipX(SP.car2);
+  SP.wall2 = flipX(SP.wallBroken);
+  // かれた くさ（はたけ）
+  SP.weedDry = osp(30, 28, (g) => {
+    const blades = [[4, 12, -1], [8, 6, -0.5], [12, 4, 0], [15, 7, 0.3], [19, 3, 0.6], [23, 9, 1], [26, 13, 1.2]];
+    for (const [x, top, d] of blades) {
+      for (let y = top; y < 27; y++) {
+        const cx = x + Math.round(d * (27 - y) * 0.25);
+        R(g, y < top + 3 ? '#c8b27a' : y > 20 ? '#5a4a30' : '#8e7a4e', cx, y, 2, 1);
+      }
+    }
+  }, '#2a2214');
+}
+
 function buildSprites() {
   buildNature();
   buildBuildings();
   buildCh1();
+  buildRuins();
   buildPlayer();
   buildCrops();
   buildIcons();
